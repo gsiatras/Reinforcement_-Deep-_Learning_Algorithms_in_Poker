@@ -15,6 +15,8 @@ class MDPAgent():
          Args:
          env (Env): Env class
         '''
+        self.gamma = 1
+        self.alpha = 1
         self.agent_id = 0
         self.use_raw = False
         self.env = env
@@ -115,13 +117,14 @@ class MDPAgent():
          '''
 
         t_vaction = self.total_values[obs]
-        t_vaction *= self.iteration
+
         # for i in range(self.env.num_actions):
         #     if i in legal_actions:
         #         t_vaction[i] += Vaction[i]
         for i in Vaction:
-            t_vaction[i] += Vaction[i]
-        t_vaction /= (self.iteration + 1)
+            k = t_vaction[i]
+            t_vaction[i] = k + self.alpha * (Vaction[i] - k)
+
 
         # update action values
         self.total_values[obs] = t_vaction
@@ -139,8 +142,8 @@ class MDPAgent():
             info (dict): A dictionary containing information
         '''
         probs = self.action_probs(state['obs'].tostring(), list(state['legal_actions'].keys()), self.policy, self.total_values)
-        #action = np.random.choice(len(probs), p=probs)
-        action = np.argmax(probs)
+        action = np.random.choice(len(probs), p=probs)
+        #action = np.argmax(probs)
 
         info = {}
         info['probs'] = {state['raw_legal_actions'][i]: float(probs[list(state['legal_actions'].keys())[i]]) for i in

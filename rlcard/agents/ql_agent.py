@@ -16,8 +16,9 @@ dp
          Args:
          env (Env): Env class
         '''
-        self.gamma = 1
-        self.alpha = 1
+        self.epsilon = 1
+        self.gamma = 0.5
+        self.alpha = 0.2
         self.agent_id = 0
         self.use_raw = False
         self.env = env
@@ -45,6 +46,9 @@ dp
             if isinstance(agent, QLAgent):
                 self.agent_id = id
                 break
+
+    def decay_epsilon(self):
+        self.epsilon *= 0.99
 
     def traverse_tree(self):
         if self.env.is_over():
@@ -157,8 +161,14 @@ dp
 
         probs = self.action_probs(state['obs'].tostring(), list(state['legal_actions'].keys()), self.policy,
                                   self.qualities)
-        action = np.random.choice(len(probs), p=probs)
-        #action = np.argmax(probs)
+        #action = np.random.choice(len(probs), p=probs)
+
+        if np.random.rand() < self.epsilon:
+            action = np.random.choice(list(state['legal_actions'].keys()))
+        else:
+            action = np.argmax(probs)
+
+        self.decay_epsilon()
 
         info = {}
         info['probs'] = {state['raw_legal_actions'][i]: float(probs[list(state['legal_actions'].keys())[i]]) for i in

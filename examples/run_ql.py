@@ -1,4 +1,4 @@
-''' An example of solve New Hold'em with Policy Iteration (gradient like method)
+''' An example of solve New Hold'em with Q-learning (gradient like method)
 '''
 import os
 import argparse
@@ -39,7 +39,7 @@ def train(args):
         env,
         os.path.join(
             args.log_dir,
-            'ql_model_vsRandom',
+            'ql_model',
         ),
     )
     agent.load()  # If we have saved model, we first load the model
@@ -47,12 +47,12 @@ def train(args):
     # Evaluate CFR against random
     eval_env.set_agents([
         agent,
-        RandomAgent(num_actions=env.num_actions),
+        ThresholdAgent(num_actions=env.num_actions),
     ])
 
     env.set_agents([
         agent,
-        RandomAgent(num_actions=env.num_actions),
+        ThresholdAgent(num_actions=env.num_actions),
     ])
 
     # Start training
@@ -86,7 +86,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--num_episodes',
         type=int,
-        default=100000,
+        default=30000,
     )
     parser.add_argument(
         '--num_eval_games',
@@ -96,7 +96,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--evaluate_every',
         type=int,
-        default=500,
+        default=200,
     )
     parser.add_argument(
         '--log_dir',
