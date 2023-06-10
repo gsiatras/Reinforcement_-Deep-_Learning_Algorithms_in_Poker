@@ -17,8 +17,8 @@ dp
          env (Env): Env class
         '''
         self.epsilon = 1
-        self.gamma = 0.5
-        self.alpha = 0.2
+        self.gamma = 0.1
+        self.alpha = 0.1
         self.agent_id = 0
         self.use_raw = False
         self.env = env
@@ -39,6 +39,7 @@ dp
         self.env.reset()
         self.find_agent()
         self.traverse_tree()
+        self.decay_epsilon()
 
     def find_agent(self):
         agents = self.env.get_agents()
@@ -87,22 +88,26 @@ dp
             quality = {}
             value = 0
             obs, legal_actions = self.get_state(current_player)
-            action_probs = self.action_probs(obs, legal_actions, self.policy, self.qualities)
-            for action in legal_actions:
-                action_prob = action_probs[action]
+            action_values = self.action_values(obs, legal_actions, self.policy, self.qualities)
+            if np.random.rand() < self.epsilon:
+                action = np.random.choice(legal_actions)
+            else:
+                action = np.argmax(action_values)
 
-                # Keep traversing the child state
-                self.env.step(action)
-                q = self.traverse_tree()
-                self.env.step_back()
-
-                value += action_prob * q * self.gamma
-                quality[action] = q  # value of each action
+            # Keep traversing the child state
+            self.env.step(action)
+            q = self.traverse_tree()
+            self.env.step_back()
 
             ''' alter policy according to new Vactions'''
-            self.update_policy(obs, quality, legal_actions)
+            # update the quality function
+            qf = self.qualities[obs]
+            qf[action] += self.alpha * (self.gamma * q - qf[action])
 
-        return value
+            self.qualities[obs] = qf
+            self.policy[obs] = softmax(qf)
+
+        return q
 
     def action_probs(self, obs, legal_actions, policy, action_values):
         ''' Obtain the action probabilities of the current state
@@ -133,6 +138,34 @@ dp
         action_probs = remove_illegal(action_probs, legal_actions)
         return action_probs
 
+    def action_values(self, obs, legal_actions, policy, action_values):
+        ''' Obtain the action probabilities of the current state
+
+        Args:
+            obs (str): state_str
+            legal_actions (list): List of leagel actions
+            player_id (int): The current player
+            policy (dict): The used policy
+            action_values (dict): The action_values of policy
+
+        Returns:
+            (tuple) that contains:
+                action_probs(numpy.array): The action probabilities
+                legal_actions (list): Indices of legal actions
+        '''
+        # if new state initialize qualities and policy
+        if obs not in self.qualities.keys():
+            tactions = np.array([-np.inf for action in range(self.env.num_actions)])
+            for action in range(self.env.num_actions):
+                if action in legal_actions:
+                    tactions[action] = 0
+            self.qualities[obs] = tactions
+            action_probs = softmax(tactions)
+            self.policy[obs] = action_probs
+        else:
+            tactions = action_values[obs].copy()
+        return tactions
+
     def update_policy(self, obs, next_state_values, legal_actions):
         ''' Update the policy according to the new state/action quality
                 Args:
@@ -161,14 +194,15 @@ dp
 
         probs = self.action_probs(state['obs'].tostring(), list(state['legal_actions'].keys()), self.policy,
                                   self.qualities)
-        #action = np.random.choice(len(probs), p=probs)
+        # action = np.random.choice(len(probs), p=probs)
+        action = np.argmax(probs)
 
-        if np.random.rand() < self.epsilon:
-            action = np.random.choice(list(state['legal_actions'].keys()))
-        else:
-            action = np.argmax(probs)
-
-        self.decay_epsilon()
+        # if np.random.rand() < self.epsilon:
+        #     action = np.random.choice(list(state['legal_actions'].keys()))
+        # else:
+        #     action = np.argmax(probs)
+        #
+        # self.decay_epsilon()
 
         info = {}
         info['probs'] = {state['raw_legal_actions'][i]: float(probs[list(state['legal_actions'].keys())[i]]) for i in
