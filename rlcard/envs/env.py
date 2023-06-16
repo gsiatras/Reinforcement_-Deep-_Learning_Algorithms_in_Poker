@@ -50,7 +50,7 @@ class Env(object):
         self.seed(config['seed'])
 
 
-    def reset(self, starter=None, agent=None, hcard=None, pcard1=None, pcard2=None):
+    def reset(self, starter=None, agent=None, hcard=None, opcard=None, pcard1=None, pcard2=None):
         ''' Start a new game
 
         Returns:
@@ -59,7 +59,7 @@ class Env(object):
                 (numpy.array): The begining state of the game
                 (int): The begining player
         '''
-        state, player_id = self.game.init_game(starter, agent, hcard, pcard1, pcard2)
+        state, player_id = self.game.init_game(starter, agent, hcard, opcard, pcard1, pcard2)
         self.action_recorder = []
         return self._extract_state(state), player_id
 

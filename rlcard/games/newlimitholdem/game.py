@@ -47,7 +47,7 @@ class NewLimitHoldemGame:
         """Specify some game specific parameters, such as number of players"""
         self.num_players = game_config['game_num_players']
 
-    def init_game(self, starter=None, agent=None, hcard=None, pcard1=None, pcard2=None):
+    def init_game(self, starter=None, agent=None, hcard=None, opcard=None, pcard1=None, pcard2=None):
         """
         Initialize the game of limit texas holdem
 
@@ -81,7 +81,7 @@ class NewLimitHoldemGame:
                 self.players[i % self.num_players].hand.append(self.dealer.deal_card())
         else:
             self.players[agent].hand.append(hcard)
-
+            self.players[(agent + 1) % self.env.num_players].hand.append(opcard)
 
 
         # Initialize public cards
