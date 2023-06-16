@@ -77,3 +77,45 @@ class ThresholdAgent(object):
         #info['probs'] = {state['raw_legal_actions'][i]: probs[list(state['legal_actions'].keys())[i]] for i in range(len(state['legal_actions']))}
 
         return self.step(state), info
+
+    def get_action_probs(self, state, num_actions):
+        '''Get the action probs of the agent
+        '''
+
+        legal_actions = state['raw_legal_actions']
+        legal_actions1 = list(state['legal_actions'].keys())
+        action_probs = np.zeros(num_actions)
+        if len(state['raw_obs']['public_cards']) == 0:  # we are on 1st round i.e. no public cards
+            hand = state['raw_obs']['hand'][0]
+            if hand == 'SA' or hand == 'HA' or hand == 'DA' or hand == 'CA' or \
+                    hand == 'SK' or hand == 'HK' or hand == 'DK' or hand == 'CK':
+                if 'raise' in legal_actions:
+                    action_probs[1] = 1
+                    return action_probs
+                elif 'call' in legal_actions:
+                    action_probs[0] = 1
+                    return action_probs
+                elif 'check' in legal_actions:
+                    action_probs[3] = 1
+                    return action_probs
+                else:  # fold
+                    action_probs[2] = 1
+                    return action_probs
+            else:  # play randomly
+                i = len(legal_actions)
+                for a in legal_actions1:
+                    action_probs[a] = 1 / i
+                return action_probs
+        else:
+            if 'raise' in legal_actions:
+                action_probs[1] = 1
+                return action_probs
+            elif 'call' in legal_actions:
+                action_probs[0] = 1
+                return action_probs
+            elif 'check' in legal_actions:
+                action_probs[3] = 1
+                return action_probs
+            else:  # fold
+                action_probs[2] = 1
+                return action_probs

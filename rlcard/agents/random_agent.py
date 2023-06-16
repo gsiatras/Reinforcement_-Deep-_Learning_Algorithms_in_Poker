@@ -45,3 +45,13 @@ class RandomAgent(object):
         info['probs'] = {state['raw_legal_actions'][i]: probs[list(state['legal_actions'].keys())[i]] for i in range(len(state['legal_actions']))}
 
         return self.step(state), info
+
+    def get_action_probs(self, state, num_actions):
+        '''Get the action probs of the agent
+        '''
+        legal_actions = list(state['legal_actions'].keys())
+        i = len(legal_actions)
+        probs = np.zeros(num_actions)
+        for a in legal_actions:
+            probs[a] = 1 / i
+        return probs
