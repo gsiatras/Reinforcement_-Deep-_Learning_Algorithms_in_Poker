@@ -57,25 +57,36 @@ dp
         new_policy = collections.defaultdict(list)
         old_policy = self.policy
 
-        for key in old_policy:
-            if isinstance(key, tuple):
-                obs, _ = key
+        for key1 in old_policy:
+            if isinstance(key1, tuple):
+                obs1, _ = key1
             else:
-                obs = key
-            new_policy = self._policy_sum(new_policy, old_policy[key], obs)
+                obs1 = key1
+
+            if obs1 in new_policy:
+                continue
+
+            same_obs_values = []
+            for key2 in old_policy:
+                if isinstance(key2, tuple):
+                    obs2, _ = key2
+                else:
+                    obs2 = key2
+                if obs1 == obs2:
+                    same_obs_values.append(old_policy[key2])
+
+            if same_obs_values:
+                new_policy = self._policy_sum(new_policy, same_obs_values, obs1)
+            else:
+                print('10')
         self.policy = new_policy
 
-    @staticmethod
-    def _policy_sum(policy, values, obs):
-        if obs not in policy.keys():
-            policy[obs] = values
-            return policy
-        else:
-            old_values = policy[obs]
-            average_values = np.mean([values, old_values], axis=0)
-            policy[obs] = average_values
-            return policy
 
+    @staticmethod
+    def _policy_sum(policy, same_obs_values, obs):
+        average_values = np.mean(same_obs_values, axis=0)
+        policy[obs] = average_values
+        return policy
 
 
     def compare_policys(self, p1, p2):
