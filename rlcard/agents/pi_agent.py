@@ -48,7 +48,7 @@ dp
             if self.iteration == 10:
                 break
         print('Optimal policy found: State space length: %d after %d iterations' % (len(self.policy), self.iteration))
-        #self.remake_policy()
+        self.remake_policy()
 
     def remake_policy(self):
         ''' Take the policy that has key: tuple(obs, opponent_card) and for every obs compute average policy
@@ -243,17 +243,29 @@ dp
                 legal_actions (list): Indices of legal actions
         '''
 
-        #if self.flag == 1:
-        obs = (obs, self.rank)
-        # if new state initialize policy
-        if obs not in policy.keys():
-            best_action = random.choice(legal_actions)
-            #best_action = np.argmax(tactions)
-            action_probs = np.array([0 for action in range(self.env.num_actions)])
-            action_probs[best_action] = 1
-            self.policy[obs] = action_probs
+        if self.flag == 1:
+            obs1 = (obs, self.rank)
+            # if new state initialize policy
+            if obs not in policy.keys() and obs1 not in policy.keys():
+                best_action = random.choice(legal_actions)
+                #best_action = np.argmax(tactions)
+                action_probs = np.array([0 for action in range(self.env.num_actions)])
+                action_probs[best_action] = 1
+                self.policy[obs1] = action_probs
+            elif obs1 not in policy.keys():
+                action_probs = policy[obs].copy()
+            else:
+                action_probs = policy[obs1].copy()
         else:
-            action_probs = policy[obs].copy()
+            if obs not in policy.keys():
+                best_action = random.choice(legal_actions)
+                #best_action = np.argmax(tactions)
+                action_probs = np.array([0 for action in range(self.env.num_actions)])
+                action_probs[best_action] = 1
+                self.policy[obs] = action_probs
+            else:
+                action_probs = policy[obs].copy()
+
         action_probs = remove_illegal(action_probs, legal_actions)
         return action_probs
 
