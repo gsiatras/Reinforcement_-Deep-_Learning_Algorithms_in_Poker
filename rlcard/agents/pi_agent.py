@@ -103,19 +103,6 @@ dp
         return True
 
 
-    def compare_values(self, v1, v2):
-        if v1.keys() != v2.keys():
-            print('dif value keys')
-            return False
-        count = 0
-        for key in v1:
-            if v1[key] != v2[key]:
-                count += 1
-        if count > 0:
-            print('changes in values: %d' % count)
-            return False
-        return True
-
     def find_agent(self):
         agents = self.env.get_agents()
         for id, agent in enumerate(agents):
@@ -132,6 +119,7 @@ dp
                 for rank3 in self.rank_list:
                     self.env.reset(self.agent_id, self.agent_id, Card(suit, rank1), Card(suit, rank2),
                                    Card(suit, rank3))
+                    self.flag = 0
                     Vtotal += self.traverse_tree()
         player = (self.agent_id + 1) % self.env.num_players
         for rank1 in self.rank_list:
@@ -139,6 +127,7 @@ dp
                 for rank3 in self.rank_list:
                     self.env.reset(player, self.agent_id, Card(suit, rank1), Card(suit, rank2),
                                    Card(suit, rank3))
+                    self.flag = 0
                     Vtotal += self.traverse_tree()
         print(Vtotal)
         return Vtotal
@@ -153,27 +142,11 @@ dp
         # compute the q of previous state
         if not current_player == self.agent_id:
             vtotal = 0
-            if self.env.op_has_card(current_player):
-                self.flag = 1
-                for rank in self.rank_list:
-                    self.rank = rank
-                    self.env.change_op_hand(Card('S', rank), current_player)
-                    # other agent move
-                    obs, legal_actions = self.get_state(current_player)
-                    state = self.env.get_state(current_player)
-                    action_probs = self.env.agents[current_player].get_action_probs(state, self.env.num_actions)
-                    Vstate = 0
-                    for action in legal_actions:
-                        prob = action_probs[action]
-                        # Keep traversing the child state
-                        self.env.step(action)
-                        v = self.traverse_tree()
-                        Vstate += v * prob
-                        self.env.step_back()
-                    vtotal += Vstate*self.card_prob
-                self.flag = 0
-                return vtotal*self.gamma
-            else:
+            # if self.env.op_has_card(current_player):
+            self.flag = 1
+            for rank in self.rank_list:
+                self.rank = rank
+                self.env.change_op_hand(Card('S', rank), current_player)
                 # other agent move
                 obs, legal_actions = self.get_state(current_player)
                 state = self.env.get_state(current_player)
@@ -181,12 +154,30 @@ dp
                 Vstate = 0
                 for action in legal_actions:
                     prob = action_probs[action]
+                    if prob == 0:
+                        continue
                     # Keep traversing the child state
                     self.env.step(action)
                     v = self.traverse_tree()
                     Vstate += v * prob
                     self.env.step_back()
-                return Vstate*self.gamma
+                vtotal += Vstate*self.card_prob
+            self.flag = 1
+            return vtotal*self.gamma
+            # else:
+            #     # other agent move
+            #     obs, legal_actions = self.get_state(current_player)
+            #     state = self.env.get_state(current_player)
+            #     action_probs = self.env.agents[current_player].get_action_probs(state, self.env.num_actions)
+            #     Vstate = 0
+            #     for action in legal_actions:
+            #         prob = action_probs[action]
+            #         # Keep traversing the child state
+            #         self.env.step(action)
+            #         v = self.traverse_tree()
+            #         Vstate += v * prob
+            #         self.env.step_back()
+            #     return Vstate*self.gamma
 
         if current_player == self.agent_id:
             quality = {}
