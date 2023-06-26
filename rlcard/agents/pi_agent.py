@@ -144,7 +144,7 @@ dp
         return Vtotal
 
 
-    def traverse_tree(self):
+    def traverse_tree(self, evaluate=False):
         if self.env.is_over():
             chips = self.env.get_payoffs()
             return chips[self.agent_id]
@@ -153,8 +153,24 @@ dp
         # compute the q of previous state
         if not current_player == self.agent_id:
             vtotal = 0
-            if self.env.op_has_card(current_player):
-                self.flag = 1
+            if evaluate:
+                # evaluate other agent for specific card
+                obs, legal_actions = self.get_state(current_player)
+                state = self.env.get_state(current_player)
+                action_probs = self.env.agents[current_player].get_action_probs(state, self.env.num_actions)
+                Vstate = 0
+                for action in legal_actions:
+                    prob = action_probs[action]
+                    if prob == 0:
+                        continue
+                    # Keep traversing the child state
+                    self.env.step(action)
+                    v = self.traverse_tree()
+                    Vstate += v * prob
+                    self.env.step_back()
+                return Vstate*self.gamma
+            else:
+                #self.flag = 1
                 for rank in self.rank_list:
                     self.rank = rank
                     self.env.change_op_hand(Card('S', rank), current_player)
@@ -165,28 +181,21 @@ dp
                     Vstate = 0
                     for action in legal_actions:
                         prob = action_probs[action]
+                        if prob == 0:
+                            continue
                         # Keep traversing the child state
                         self.env.step(action)
-                        v = self.traverse_tree()
+                        v = self.traverse_tree(True)
                         Vstate += v * prob
                         self.env.step_back()
                     vtotal += Vstate*self.card_prob
-                self.flag = 0
+                #self.flag = 0
+                    for action in legal_actions:
+                        self.env.step(action)
+                        self.traverse_tree()
+                        self.env.step_back()
                 return vtotal*self.gamma
-            else:
-                # other agent move
-                obs, legal_actions = self.get_state(current_player)
-                state = self.env.get_state(current_player)
-                action_probs = self.env.agents[current_player].get_action_probs(state, self.env.num_actions)
-                Vstate = 0
-                for action in legal_actions:
-                    prob = action_probs[action]
-                    # Keep traversing the child state
-                    self.env.step(action)
-                    v = self.traverse_tree()
-                    Vstate += v * prob
-                    self.env.step_back()
-                return Vstate*self.gamma
+
 
         if current_player == self.agent_id:
             quality = {}
@@ -205,9 +214,10 @@ dp
                 quality[action] = v  # Qvalue
                 Vstate += v*prob
 
-            self.state_values[obs] = Vstate
+            #self.state_values[obs] = Vstate
             ''' alter policy by choosing the action with the max value'''
-            self.improve_policy(obs, quality, legal_actions)
+            if not evaluate:
+                self.improve_policy(obs, quality, legal_actions)
 
         return Vstate * self.gamma
 
