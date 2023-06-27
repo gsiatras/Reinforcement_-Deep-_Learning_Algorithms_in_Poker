@@ -6,7 +6,7 @@ import argparse
 import rlcard
 from rlcard.agents import (
     QLAgent, SARSAAgent,
-    RandomAgent, ThresholdAgent, ThresholdAgent2, PIAgent
+    RandomAgent, ThresholdAgent, ThresholdAgent2, PIAgent, MDPAgent
 )
 from rlcard.utils import (
     set_seed,

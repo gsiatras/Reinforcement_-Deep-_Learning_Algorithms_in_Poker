@@ -59,7 +59,10 @@ class Env(object):
                 (numpy.array): The begining state of the game
                 (int): The begining player
         '''
-        state, player_id = self.game.init_game(starter, agent, hcard, pcard1, pcard2)
+        if starter is None:
+            state, player_id = self.game.init_game()
+        else:
+            state, player_id = self.game.init_game(starter, agent, hcard, pcard1, pcard2)
         self.action_recorder = []
         return self._extract_state(state), player_id
 
@@ -168,6 +171,10 @@ class Env(object):
         payoffs = self.get_payoffs()
 
         return trajectories, payoffs
+
+    def first_round(self):
+        if self.game.round_counter == 0:
+            return True
 
     def is_over(self):
         ''' Check whether the curent game is over

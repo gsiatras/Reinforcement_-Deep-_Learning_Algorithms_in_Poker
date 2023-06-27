@@ -21,3 +21,4 @@ from rlcard.agents.threshold_agent2 import ThresholdAgent2
 from rlcard.agents.sarsa_agent import SARSAAgent
 from rlcard.agents.ql_agent import QLAgent
 from rlcard.agents.pi_agent import PIAgent
+from rlcard.agents.mdp_agent import MDPAgent
