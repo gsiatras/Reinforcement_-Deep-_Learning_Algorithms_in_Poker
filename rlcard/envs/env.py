@@ -175,6 +175,8 @@ class Env(object):
     def first_round(self):
         if self.game.round_counter == 0:
             return True
+        else:
+            return False
 
     def is_over(self):
         ''' Check whether the curent game is over

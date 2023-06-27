@@ -214,6 +214,7 @@ dp
 
             self.state_values[obs] = Vstate
             ''' alter policy by choosing the action with the max value'''
+            self.roundzero()
             self.improve_policy(obs, quality, legal_actions)
             # new_action_probs = self.action_probs(obs, legal_actions, self.policy)
             # for action in legal_actions:
