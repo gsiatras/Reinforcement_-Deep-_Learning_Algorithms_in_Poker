@@ -32,7 +32,9 @@ dp
         self.state_values = collections.defaultdict(list)
         self.iteration = 0
         self.flag = 0
+        self.flag2 = 0
         self.rank = None
+        self.public_ranks = None
 
     def train(self, episodes=None):
         ''' Find optimal policy
@@ -87,6 +89,8 @@ dp
     def first_run(self):
         if self.env.is_over():
             return
+
+        self.roundzero()
         current_player = self.env.get_player_id()
         # compute the q of previous state
         if not current_player == self.agent_id:
@@ -114,6 +118,7 @@ dp
     def evaluate_policy(self, first=None):
         '''Run through the game to initialize the state space, the random policy, and the Value function
         of random policy'''
+
         if first is None:
             self.find_agent()
             suit = 'S'
@@ -252,8 +257,10 @@ dp
                 self.policy[obs1] = action_probs
             elif obs1 not in policy.keys():
                 action_probs = policy[obs].copy()
+                print('1000')
             else:
                 action_probs = policy[obs1].copy()
+                print('1000')
         else:
             if obs not in policy.keys():
                 best_action = random.choice(legal_actions)
@@ -324,3 +331,10 @@ dp
             if isinstance(agent, MDPAgent):
                 self.agent_id = id
                 break
+
+
+    def roundzero(self):
+        if self.env.first_round():
+            self.flag2 = 1
+        else:
+            self.flag2 = 0
