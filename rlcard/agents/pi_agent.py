@@ -12,7 +12,7 @@ class PIAgent:
     ''' Implement policy - iteration algorithm
     '''
 
-    def __init__(self, env, g=1):
+    def __init__(self, env, model_path='./ql_model', g=1):
         ''' Initialize Agent
 dp
          Args:
@@ -26,7 +26,7 @@ dp
         self.env = env
         self.rank_list = ['A', 'T', 'J', 'Q', 'K']
         self.card_prob = 0.2
-
+        self.model_path = model_path
         # A policy is a dict state_str -> action probabilities
         self.policy = collections.defaultdict(list)
         self.state_values = collections.defaultdict(list)
@@ -104,19 +104,6 @@ dp
             return False
         return True
 
-
-    def compare_values(self, v1, v2):
-        if v1.keys() != v2.keys():
-            print('dif value keys')
-            return False
-        count = 0
-        for key in v1:
-            if v1[key] != v2[key]:
-                count += 1
-        if count > 0:
-            print('changes in values: %d' % count)
-            return False
-        return True
 
     def find_agent(self):
         agents = self.env.get_agents()
@@ -212,7 +199,7 @@ dp
                 quality[action] = v  # Qvalue
                 Vstate += v*prob
 
-            self.state_values[obs] = Vstate
+            #self.state_values[obs] = Vstate
             ''' alter policy by choosing the action with the max value'''
             self.roundzero()
             self.improve_policy(obs, quality, legal_actions)
@@ -315,6 +302,9 @@ dp
         action_probs = remove_illegal(action_probs, legal_actions)
         return action_probs
 
+    #def get_policy(self, obs, opponent_card, ):
+
+
 
     def eval_step(self, state):
         ''' Given a state, predict action based on average policy
@@ -369,3 +359,25 @@ dp
             self.flag2 = 1
         else:
             self.flag2 = 0
+
+    def save(self):
+        '''  Save model
+        '''
+
+        if not os.path.exists(self.model_path):
+            os.makedirs(self.model_path)
+
+        policy_file = open(os.path.join(self.model_path, 'policy.pkl'),'wb')
+        pickle.dump(self.policy, policy_file)
+        policy_file.close()
+
+    def load(self):
+        ''' Load model
+        '''
+
+        if not os.path.exists(self.model_path):
+            return
+
+        policy_file = open(os.path.join(self.model_path, 'policy.pkl'),'rb')
+        self.policy = pickle.load(policy_file)
+        policy_file.close()

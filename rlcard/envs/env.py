@@ -282,3 +282,7 @@ class Env(object):
             return True
         else:
             return False
+
+    def get_card(self, player_id):
+        card = self.game.op_hand(player_id)
+        return card.rank

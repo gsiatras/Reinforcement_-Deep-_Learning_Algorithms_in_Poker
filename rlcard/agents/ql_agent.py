@@ -168,6 +168,10 @@ dp
         #     action = np.argmax(probs)
         #
         # self.decay_epsilon()
+        self.find_agent()
+        # other_agent = (self.agent_id + 1) % self.env.num_players
+        # cardrank = self.env.get_card(other_agent)
+        # print(cardrank)
 
         info = {}
         info['probs'] = {state['raw_legal_actions'][i]: float(probs[list(state['legal_actions'].keys())[i]]) for i in
