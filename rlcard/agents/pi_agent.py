@@ -32,7 +32,9 @@ dp
         self.state_values = collections.defaultdict(list)
         self.iteration = 0
         self.flag = 0
+        self.flag2 = 0
         self.rank = None
+        self.public_ranks = None
 
     def train(self, episodes=None):
         ''' Find optimal policy
@@ -59,7 +61,7 @@ dp
 
         for key1 in old_policy:
             if isinstance(key1, tuple):
-                obs1, _ = key1
+                obs1 = key1[0]
             else:
                 obs1 = key1
 
@@ -69,7 +71,7 @@ dp
             same_obs_values = []
             for key2 in old_policy:
                 if isinstance(key2, tuple):
-                    obs2, _ = key2
+                    obs2 = key2[0]
                 else:
                     obs2 = key2
                 if obs1 == obs2:
@@ -132,6 +134,7 @@ dp
                 for rank3 in self.rank_list:
                     self.env.reset(self.agent_id, self.agent_id, Card(suit, rank1), Card(suit, rank2),
                                    Card(suit, rank3))
+                    self.public_ranks = (rank2, rank3)
                     Vtotal += self.traverse_tree()
         player = (self.agent_id + 1) % self.env.num_players
         for rank1 in self.rank_list:
@@ -139,6 +142,7 @@ dp
                 for rank3 in self.rank_list:
                     self.env.reset(player, self.agent_id, Card(suit, rank1), Card(suit, rank2),
                                    Card(suit, rank3))
+                    self.public_ranks = (rank2, rank3)
                     Vtotal += self.traverse_tree()
         print(Vtotal)
         return Vtotal
@@ -148,6 +152,8 @@ dp
         if self.env.is_over():
             chips = self.env.get_payoffs()
             return chips[self.agent_id]
+
+        self.roundzero()
 
         current_player = self.env.get_player_id()
         # compute the q of previous state
@@ -165,7 +171,7 @@ dp
                         continue
                     # Keep traversing the child state
                     self.env.step(action)
-                    v = self.traverse_tree()
+                    v = self.traverse_tree(True)
                     Vstate += v * prob
                     self.env.step_back()
                 return Vstate*self.gamma
@@ -198,26 +204,39 @@ dp
 
 
         if current_player == self.agent_id:
-            quality = {}
-            Vstate = 0
-            obs, legal_actions = self.get_state(current_player)
-            # if first time we encounter state initialize qualities
-            action_probs = self.action_probs(obs, legal_actions, self.policy)
-
-            for action in legal_actions:
-                prob = action_probs[action]
-                # Keep traversing the child state
-                self.env.step(action)
-                v = self.traverse_tree()
-                self.env.step_back()
-
-                quality[action] = v  # Qvalue
-                Vstate += v*prob
-
-            #self.state_values[obs] = Vstate
-            ''' alter policy by choosing the action with the max value'''
             if not evaluate:
+                quality = {}
+                Vstate = 0
+                obs, legal_actions = self.get_state(current_player)
+                # if first time we encounter state initialize qualities
+                action_probs = self.action_probs(obs, legal_actions, self.policy)
+
+                for action in legal_actions:
+                    prob = action_probs[action]
+                    # Keep traversing the child state
+                    self.env.step(action)
+                    v = self.traverse_tree()
+                    self.env.step_back()
+
+                    quality[action] = v  # Qvalue
+                    Vstate += v*prob
+
+                #self.state_values[obs] = Vstate
+                ''' alter policy by choosing the action with the max value'''
+                self.roundzero()
                 self.improve_policy(obs, quality, legal_actions)
+            else:
+                Vstate = 0
+                obs, legal_actions = self.get_state(current_player)
+                # if first time we encounter state initialize qualities
+                action_probs = self.action_probs(obs, legal_actions, self.policy)
+                for action in legal_actions:
+                    prob = action_probs[action]
+                    # Keep traversing the child state
+                    self.env.step(action)
+                    v = self.traverse_tree(True)
+                    self.env.step_back()
+                    Vstate += v * prob
 
         return Vstate * self.gamma
 
@@ -232,9 +251,17 @@ dp
             q[i] = quality[i]
 
         new_policy = softmax(q)
-        if self.flag == 1:
+        if self.flag == 1 and self.flag2 == 0:
             obs = (obs, self.rank)
-        self.policy[obs] = new_policy
+        elif self.flag == 1 and self.flag2 == 1:
+            obs = (obs, self.rank, self.public_ranks)
+        elif self.flag == 0 and self.flag2 == 1:
+            obs = (obs, self.public_ranks)
+
+        if obs in self.policy.keys():
+            self.policy[obs] = new_policy
+        else:
+            print('eroor')
 
 
     def action_probs(self, obs, legal_actions, policy):
@@ -253,8 +280,34 @@ dp
                 legal_actions (list): Indices of legal actions
         '''
 
-        if self.flag == 1:
+        if self.flag == 1 and self.flag2 == 0:
             obs1 = (obs, self.rank)
+            # if new state initialize policy
+            if obs not in policy.keys() and obs1 not in policy.keys():
+                best_action = random.choice(legal_actions)
+                #best_action = np.argmax(tactions)
+                action_probs = np.array([0 for action in range(self.env.num_actions)])
+                action_probs[best_action] = 1
+                self.policy[obs1] = action_probs
+            elif obs1 not in policy.keys():
+                action_probs = policy[obs].copy()
+            else:
+                action_probs = policy[obs1].copy()
+        elif self.flag == 1 and self.flag2 == 1:
+            obs1 = (obs, self.rank, self.public_ranks)
+            # if new state initialize policy
+            if obs not in policy.keys() and obs1 not in policy.keys():
+                best_action = random.choice(legal_actions)
+                #best_action = np.argmax(tactions)
+                action_probs = np.array([0 for action in range(self.env.num_actions)])
+                action_probs[best_action] = 1
+                self.policy[obs1] = action_probs
+            elif obs1 not in policy.keys():
+                action_probs = policy[obs].copy()
+            else:
+                action_probs = policy[obs1].copy()
+        elif self.flag == 0 and self.flag2 == 1:
+            obs1 = (obs, self.public_ranks)
             # if new state initialize policy
             if obs not in policy.keys() and obs1 not in policy.keys():
                 best_action = random.choice(legal_actions)
@@ -278,6 +331,7 @@ dp
 
         action_probs = remove_illegal(action_probs, legal_actions)
         return action_probs
+
 
 
     def eval_step(self, state):
@@ -328,3 +382,8 @@ dp
         state = self.env.get_state(player_id)
         return state['obs'].tostring(), list(state['legal_actions'].keys())
 
+    def roundzero(self):
+        if self.env.first_round():
+            self.flag2 = 1
+        else:
+            self.flag2 = 0

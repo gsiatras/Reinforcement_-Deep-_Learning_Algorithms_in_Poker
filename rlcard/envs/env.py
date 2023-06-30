@@ -273,3 +273,9 @@ class Env(object):
             return True
         else:
             return False
+
+    def first_round(self):
+        if self.game.round_counter == 0:
+            return True
+        else:
+            return False
