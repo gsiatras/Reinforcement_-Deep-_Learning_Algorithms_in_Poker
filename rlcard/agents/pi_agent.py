@@ -197,6 +197,9 @@ dp
                     vtotal += Vstate*self.card_prob
                 #self.flag = 0
                     for action in legal_actions:
+                        prob = action_probs[action]
+                        if prob == 0:
+                            continue
                         self.env.step(action)
                         self.traverse_tree()
                         self.env.step_back()
@@ -251,11 +254,7 @@ dp
             q[i] = quality[i]
 
         new_policy = softmax(q)
-        if self.flag == 1 and self.flag2 == 0:
-            obs = (obs, self.rank)
-        elif self.flag == 1 and self.flag2 == 1:
-            obs = (obs, self.rank, self.public_ranks)
-        elif self.flag == 0 and self.flag2 == 1:
+        if self.flag2 == 1:
             obs = (obs, self.public_ranks)
 
         if obs in self.policy.keys():
@@ -280,33 +279,8 @@ dp
                 legal_actions (list): Indices of legal actions
         '''
 
-        if self.flag == 1 and self.flag2 == 0:
-            obs1 = (obs, self.rank)
-            # if new state initialize policy
-            if obs not in policy.keys() and obs1 not in policy.keys():
-                best_action = random.choice(legal_actions)
-                #best_action = np.argmax(tactions)
-                action_probs = np.array([0 for action in range(self.env.num_actions)])
-                action_probs[best_action] = 1
-                self.policy[obs1] = action_probs
-            elif obs1 not in policy.keys():
-                action_probs = policy[obs].copy()
-            else:
-                action_probs = policy[obs1].copy()
-        elif self.flag == 1 and self.flag2 == 1:
-            obs1 = (obs, self.rank, self.public_ranks)
-            # if new state initialize policy
-            if obs not in policy.keys() and obs1 not in policy.keys():
-                best_action = random.choice(legal_actions)
-                #best_action = np.argmax(tactions)
-                action_probs = np.array([0 for action in range(self.env.num_actions)])
-                action_probs[best_action] = 1
-                self.policy[obs1] = action_probs
-            elif obs1 not in policy.keys():
-                action_probs = policy[obs].copy()
-            else:
-                action_probs = policy[obs1].copy()
-        elif self.flag == 0 and self.flag2 == 1:
+
+        if self.flag2 == 1:
             obs1 = (obs, self.public_ranks)
             # if new state initialize policy
             if obs not in policy.keys() and obs1 not in policy.keys():
@@ -315,10 +289,10 @@ dp
                 action_probs = np.array([0 for action in range(self.env.num_actions)])
                 action_probs[best_action] = 1
                 self.policy[obs1] = action_probs
-            elif obs1 not in policy.keys():
-                action_probs = policy[obs].copy()
-            else:
+            elif obs not in policy.keys():
                 action_probs = policy[obs1].copy()
+            else:
+                action_probs = policy[obs].copy()
         else:
             if obs not in policy.keys():
                 best_action = random.choice(legal_actions)
