@@ -122,3 +122,6 @@ class NewLimitholdemEnv(Env):
 
     def get_agents(self):
         return self.agents
+
+    def change_public_cards(self, card1, card2):
+        self.game.change_public_cards(card1, card2)

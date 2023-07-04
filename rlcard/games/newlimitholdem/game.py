@@ -181,6 +181,7 @@ class NewLimitHoldemGame:
             return None
         else:
             return self.players[player].hand[0]
+
     def step_back(self):
         """
         Return to the previous state of the game
@@ -277,3 +278,13 @@ class NewLimitHoldemGame:
             (list): A list of legal actions
         """
         return self.round.get_legal_actions()
+
+    def change_public_cards(self, card1, card2):
+        self.public_cards.append(card1)
+        self.public_cards.append(card2)
+        if not self.public_cards:
+            self.public_cards.append(card1)
+            self.public_cards.append(card2)
+        else:
+            self.public_cards[0] = card1
+            self.public_cards[1] = card2
