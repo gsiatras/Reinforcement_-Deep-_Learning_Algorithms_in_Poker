@@ -2,7 +2,7 @@
 '''
 import os
 
-import args as args
+# import args as args
 
 import rlcard
 from rlcard.agents import LimitholdemHumanAgent as HumanAgent, SARSAAgent
@@ -32,6 +32,7 @@ ql_agent = QLAgent(
         ),
     )
 ql_agent.load()
+
 
 pi_agent = PIAgent(
         env,
