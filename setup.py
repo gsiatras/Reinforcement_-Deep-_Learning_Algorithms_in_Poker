@@ -34,6 +34,7 @@ setuptools.setup(
                    'games/uno/jsondata/action_space.json',
                    'games/limitholdem/card2index.json',
                    'games/newlimitholdem/card2index.json',
+                   'games/newlimitholdem2/card2index2.json',
                    'games/leducholdem/card2index.json',
                    'games/doudizhu/jsondata.zip',
                    'games/uno/jsondata/*',

@@ -6,7 +6,7 @@ import argparse
 import rlcard
 from rlcard.agents import (
     QLAgent, SARSAAgent,
-    RandomAgent, ThresholdAgent, ThresholdAgent2
+    RandomAgent, ThresholdAgent, ThresholdAgent2, ThresholdAgent3
 )
 from rlcard.utils import (
     set_seed,
@@ -48,12 +48,12 @@ def train(args):
     # Evaluate Ql
     eval_env.set_agents([
         agent,
-        RandomAgent(num_actions=env.num_actions),
+        ThresholdAgent3(num_actions=env.num_actions),
     ])
 
     env.set_agents([
         agent,
-        RandomAgent(num_actions=env.num_actions),
+        ThresholdAgent3(num_actions=env.num_actions),
     ])
 
     # Start training
@@ -90,7 +90,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--num_episodes',
         type=int,
-        default=30000,
+        default=20000,
     )
     parser.add_argument(
         '--num_eval_games',
@@ -100,7 +100,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--evaluate_every',
         type=int,
-        default=100,
+        default=250,
     )
     parser.add_argument(
         '--log_dir',

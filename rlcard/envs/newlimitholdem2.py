@@ -23,10 +23,10 @@ class NewLimitholdemEnv2(Env):
         self.game = Game()
         super().__init__(config)
         self.actions = ['call', 'raise', 'fold', 'check']
-        self.state_shape = [[38] for _ in range(self.num_players)]
+        self.state_shape = [[57] for _ in range(self.num_players)]
         self.action_shape = [None for _ in range(self.num_players)]
 
-        with open(os.path.join(rlcard.__path__[0], 'games/newlimitholdem2/card2index.json'), 'r') as file:
+        with open(os.path.join(rlcard.__path__[0], 'games/newlimitholdem2/card2index2.json'), 'r') as file:
             self.card2index = json.load(file)
 
     def _get_legal_actions(self):
@@ -55,19 +55,19 @@ class NewLimitholdemEnv2(Env):
         public_cards = state['public_cards']
         hand = state['hand']
 
-        obs = np.zeros(42)
+        obs = np.zeros(57)
         idx = [self.card2index[card] for card in hand]
         obs[idx] = 1
         idx2 = []
         for j, card in enumerate(public_cards):
-            idx2 = [(self.card2index[card] + 8*j)]
+            idx2 = [(self.card2index[card] + 13*j)]
             obs[idx2] = 1
-        obs[state['my_chips'] + 24] = 1
-        obs[sum(state['all_chips']) - state['my_chips'] + 30] = 1
+        obs[state['my_chips'] + 39] = 1
+        obs[sum(state['all_chips']) - state['my_chips'] + 45] = 1
         for i in legal_actions:
-            idx3 = [i + 36]
+            idx3 = [i + 51]
             obs[idx3] = 1
-        obs[41] = state['first']
+        obs[56] = state['first']
 
         extracted_state['obs'] = obs
         extracted_state['raw_obs'] = state

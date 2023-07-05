@@ -1,10 +1,10 @@
-from rlcard.utils.utils import init_32_deck
+from rlcard.utils.utils import init_52_deck
 
 
 class NewLimitHoldemDealer:
     def __init__(self, np_random):
         self.np_random = np_random
-        self.deck = init_32_deck()
+        self.deck = init_52_deck()
         self.shuffle()
         self.pot = 0
 
