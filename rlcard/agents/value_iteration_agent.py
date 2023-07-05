@@ -64,7 +64,7 @@ class ValueIterAgent:
         in order to find optimal policy
     '''
 
-    def __init__(self, env, model_path='./vi_model', gamma=0.6, conv_limit=1e-10):
+    def __init__(self, env, model_path='./vi_model', gamma=0.1, conv_limit=1e-10):
         ''' Initilize the value iteration agent
 
         Args:
