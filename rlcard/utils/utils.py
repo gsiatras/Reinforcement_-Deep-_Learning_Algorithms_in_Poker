@@ -51,6 +51,17 @@ def init_20_deck():
     res = [Card(suit, rank) for suit in suit_list for rank in rank_list]
     return res
 
+def init_32_deck():
+    ''' Initialize a small deck of 28 cards for newlimit2 poker
+
+        Returns:
+            (list): Alist of Card object
+        '''
+    suit_list = ['S', 'H', 'D', 'C']
+    rank_list = ['5', '8', '9', 'A', 'T', 'J', 'Q', 'K']
+    res = [Card(suit, rank) for suit in suit_list for rank in rank_list]
+    return res
+
 
 def init_54_deck():
     ''' Initialize a standard deck of 52 cards, BJ and RJ

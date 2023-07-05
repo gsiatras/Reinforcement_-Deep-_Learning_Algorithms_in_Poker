@@ -40,7 +40,7 @@ def train(args):
         env,
         os.path.join(
             args.log_dir,
-            'ql_model',
+            'pi_model',
         ),
     )
 
@@ -48,12 +48,12 @@ def train(args):
     # Evaluate PI
     eval_env.set_agents([
         agent,
-        ThresholdAgent(num_actions=env.num_actions),
+        ThresholdAgent2(num_actions=env.num_actions),
     ])
 
     env.set_agents([
         agent,
-        ThresholdAgent(num_actions=env.num_actions),
+        ThresholdAgent2(num_actions=env.num_actions),
     ])
 
 
@@ -90,7 +90,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--log_dir',
         type=str,
-        default='experiments/new_limit_holdem_pi_result/',
+        default='rlcard/rlcard/models/newlimitholdem/',
     )
     parser.add_argument(
         '--num_episodes',
