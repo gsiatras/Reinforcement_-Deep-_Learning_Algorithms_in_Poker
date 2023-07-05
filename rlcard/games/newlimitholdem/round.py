@@ -81,6 +81,7 @@ class NewLimitHoldemRound:
             self.raised[self.game_pointer] = max(self.raised) + self.raise_amount
             players[self.game_pointer].in_chips += diff
             self.action_taken += 1
+            self.have_raised += 1
             self.not_raise_num = 1
 
         elif action == 'fold':
