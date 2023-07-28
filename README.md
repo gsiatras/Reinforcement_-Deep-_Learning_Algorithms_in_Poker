@@ -12,4 +12,4 @@ Q-learning variation algorithm implemented: ql_agent(QLAgent)
 run_ql: train ql, tune_ql: tune hyperparameters of ql
 Currently implementing a policy iteration algorithm agent: 
 SARSA variation algorithm implemented: sarsa_agent(SARSAAgent)
-
+Policy Iteration variation algorithm implemented: pi_agent(PIAgent)
