@@ -13,6 +13,7 @@ from rlcard.utils import (
     tournament,
     Logger,
     plot_curve,
+    plot_curve2
 )
 
 
@@ -42,18 +43,19 @@ def train(args):
             args.log_dir,
             'ql_model',
         ),
+        0.05
     )
     agent.load()  # If we have saved model, we first load the model
 
     # Evaluate Ql
     eval_env.set_agents([
         agent,
-        RandomAgent(num_actions=env.num_actions),
+        ThresholdAgent2(num_actions=env.num_actions),
     ])
 
     env.set_agents([
         agent,
-        RandomAgent(num_actions=env.num_actions),
+        ThresholdAgent2(num_actions=env.num_actions),
     ])
 
     # Start training
@@ -63,12 +65,14 @@ def train(args):
             # Evaluate the performance. Play with Random agents.
             if episode % args.evaluate_every == 0:
                 agent.save()  # Save model
-                logger.log_performance(
+                reward, winrate = tournament(
+                    eval_env,
+                    args.num_eval_games
+                )
+                logger.log_performance1(
                     episode,
-                    tournament(
-                        eval_env,
-                        args.num_eval_games
-                    )[0]
+                    reward[0],
+                    winrate[0]
                 )
                 # print(agent.epsilon)
                 #print(agent.v)
@@ -77,8 +81,10 @@ def train(args):
 
         # Get the paths
         csv_path, fig_path = logger.csv_path, logger.fig_path
+        csv2_path, fig2_path = logger.csv2_path, logger.fig2_path
     # Plot the learning curve
     plot_curve(csv_path, fig_path, 'Q-learning')
+    plot_curve2(csv2_path, fig2_path, 'Q-learning')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("Q-Learning Agent example in RLCard")

@@ -47,13 +47,13 @@ def train(args):
 
     # Evaluate PI
     eval_env.set_agents([
+        ThresholdAgent(num_actions=env.num_actions),
         agent,
-        ThresholdAgent2(num_actions=env.num_actions),
     ])
 
     env.set_agents([
+        ThresholdAgent(num_actions=env.num_actions),
         agent,
-        ThresholdAgent2(num_actions=env.num_actions),
     ])
 
 
@@ -63,12 +63,14 @@ def train(args):
         agent.train()
         agent.save()
         for episode in range(args.num_episodes):
-            logger.log_performance(
+            reward, winrate = tournament(
+                eval_env,
+                args.num_eval_games
+            )
+            logger.log_performance1(
                 episode,
-                tournament(
-                    eval_env,
-                    args.num_eval_games
-                )[0]
+                reward[0],
+                winrate[0]
             )
         # Get the paths
         csv_path, fig_path = logger.csv_path, logger.fig_path

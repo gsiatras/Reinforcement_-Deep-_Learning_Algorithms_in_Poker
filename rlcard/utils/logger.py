@@ -18,6 +18,10 @@ class Logger(object):
         self.csv_path = os.path.join(self.log_dir, 'performance.csv')
         self.fig_path = os.path.join(self.log_dir, 'fig.png')
 
+        self.txt2_path = os.path.join(self.log_dir, 'log2.txt')
+        self.csv2_path = os.path.join(self.log_dir, 'performance2.csv')
+        self.fig2_path = os.path.join(self.log_dir, 'fig2.png')
+
         if not os.path.exists(self.log_dir):
             os.makedirs(self.log_dir)
 
@@ -26,6 +30,13 @@ class Logger(object):
         fieldnames = ['episode', 'reward']
         self.writer = csv.DictWriter(self.csv_file, fieldnames=fieldnames)
         self.writer.writeheader()
+
+        self.txt2_file = open(self.txt2_path, 'w')
+        self.csv2_file = open(self.csv2_path, 'w')
+        fieldnames = ['episode', 'winrate']
+        self.writer2 = csv.DictWriter(self.csv2_file, fieldnames=fieldnames)
+        self.writer2.writeheader()
+
 
         return self
 
@@ -51,9 +62,28 @@ class Logger(object):
         self.log('  reward       |  ' + str(reward))
         self.log('----------------------------------------')
 
+    def log_performance1(self, episode, reward, winrate):
+        ''' Log a point in the curve
+        Args:
+            episode (int): the episode of the current point
+            reward (float): the reward of the current point
+        '''
+        self.writer.writerow({'episode': episode, 'reward': reward})
+        self.writer2.writerow({'episode': episode, 'winrate': winrate})
+        print('')
+        self.log('----------------------------------------')
+        self.log('  episode      |  ' + str(episode))
+        self.log('  reward       |  ' + str(reward))
+        self.log('  winrate       |  ' + str(winrate))
+        self.log('----------------------------------------')
+
     def __exit__(self, type, value, traceback):
         if self.txt_path is not None:
             self.txt_file.close()
         if self.csv_path is not None:
             self.csv_file.close()
+        if self.txt2_path is not None:
+            self.txt2_file.close()
+        if self.csv2_path is not None:
+            self.csv2_file.close()
         print('\nLogs saved in', self.log_dir)

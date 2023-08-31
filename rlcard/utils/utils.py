@@ -265,6 +265,7 @@ def tournament(env, num):
         A list of avrage payoffs for each player
     '''
     payoffs = [0 for _ in range(env.num_players)]
+    winrate = [0 for _ in range(env.num_players)]
     counter = 0
     while counter < num:
         _, _payoffs = env.run(is_training=False)
@@ -272,14 +273,21 @@ def tournament(env, num):
             for _p in _payoffs:
                 for i, _ in enumerate(payoffs):
                     payoffs[i] += _p[i]
+                    if _p[i] > 0:
+                        winrate[i] += 1
                 counter += 1
         else:
             for i, _ in enumerate(payoffs):
                 payoffs[i] += _payoffs[i]
+                if _payoffs[i] > 0:
+                    winrate[i] += 1
             counter += 1
+
     for i, _ in enumerate(payoffs):
         payoffs[i] /= counter
-    return payoffs
+        winrate[i] /= counter
+
+    return payoffs, winrate
 
 def plot_curve(csv_path, save_path, algorithm):
     ''' Read data from csv file and plot the results
@@ -297,6 +305,31 @@ def plot_curve(csv_path, save_path, algorithm):
         fig, ax = plt.subplots()
         ax.plot(xs, ys, label=algorithm)
         ax.set(xlabel='episode', ylabel='reward')
+        ax.legend()
+        ax.grid()
+
+        save_dir = os.path.dirname(save_path)
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        fig.savefig(save_path)
+
+def plot_curve2(csv_path, save_path, algorithm):
+    ''' Read data from csv file and plot the results
+    '''
+    import os
+    import csv
+    import matplotlib.pyplot as plt
+    with open(csv_path) as csvfile:
+        reader = csv.DictReader(csvfile)
+        xs = []
+        ys = []
+        for row in reader:
+            xs.append(int(row['episode']))
+            ys.append(float(row['winrate']))
+        fig, ax = plt.subplots()
+        ax.plot(xs, ys, label=algorithm)
+        ax.set(xlabel='episode', ylabel='winrate')
         ax.legend()
         ax.grid()
 

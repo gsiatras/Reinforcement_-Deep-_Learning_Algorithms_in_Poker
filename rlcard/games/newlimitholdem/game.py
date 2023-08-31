@@ -97,10 +97,11 @@ class NewLimitHoldemGame:
 
         # The player that plays the first
         if starter is None:
-            self.game_pointer = (b + 1) % self.num_players
+            self.game_pointer = self.np_random.randint(0, self.num_players)
         else:
             self.game_pointer = starter
         self.first = self.game_pointer
+
 
         # Initialize a bidding round, in the first round, the big blind and the small blind needs to
         # be passed to the round for processing.

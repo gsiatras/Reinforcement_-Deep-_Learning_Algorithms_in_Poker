@@ -92,6 +92,7 @@ class LeducholdemGame(Game):
 
         state = self.get_state(self.game_pointer)
 
+
         return state, self.game_pointer
 
     def step(self, action):
