@@ -314,7 +314,7 @@ def plot_curve(csv_path, save_path, algorithm):
 
         fig.savefig(save_path)
 
-def plot_curve2(csv_path, save_path, algorithm):
+def plot_curve2(csv_path, save_path, algorithm, name):
     ''' Read data from csv file and plot the results
     '''
     import os
@@ -326,10 +326,10 @@ def plot_curve2(csv_path, save_path, algorithm):
         ys = []
         for row in reader:
             xs.append(int(row['episode']))
-            ys.append(float(row['winrate']))
+            ys.append(float(row[name]))
         fig, ax = plt.subplots()
         ax.plot(xs, ys, label=algorithm)
-        ax.set(xlabel='episode', ylabel='winrate')
+        ax.set(xlabel='episode', ylabel=name)
         ax.legend()
         ax.grid()
 

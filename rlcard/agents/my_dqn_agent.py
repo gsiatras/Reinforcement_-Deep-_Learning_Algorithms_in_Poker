@@ -12,6 +12,7 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 from random import sample
+from rlcard.utils.utils import *
 
 from rlcard.utils.utils import remove_illegal
 
@@ -24,22 +25,25 @@ class Trans:
     next_state: Any
     done: bool
 
+
 class MYDQNAgent:
     '''
     Approximate clone of rlcard.agents.dqn_agent.DQNAgent
     that depends on PyTorch instead of Tensorflow
     '''
     def __init__(self,
-                 model,
                  env,
                  model_path='./Dqn_model',
                  epsilon_decay=0.995,
                  epsilon_start=1.0,
                  epsilon_end=0.01,
-                 card_obs_shape=(6, 13, 4),
-                 action_obs_shape=(24, 4, 3),
+                 card_obs_shape=(6, 4, 13),
+                 action_obs_shape=(24, 3, 4),
                  learning_rate=0.00005,
                  num_actions=4,
+                 batch_size=64,
+                 tgt_update_freq=500,
+                 train_steps=1,
                  device=None):
 
         self.num_actions = num_actions
@@ -51,35 +55,65 @@ class MYDQNAgent:
         self.card_obs_shape = card_obs_shape
         self.action_obs_shape = action_obs_shape
         self.alpha = learning_rate
+        self.tgt_update_freq = tgt_update_freq
+        self.num_train_steps = train_steps
+        self.batch_size = batch_size
+        self.agent_id = 0
 
         self.model = Model(card_obs_shape, action_obs_shape, num_actions, self.alpha)
         self.tgt = Model(card_obs_shape, action_obs_shape, num_actions, self.alpha)
 
         self.rb = ReplayBuffer
+        self.episodes = 0
+        losses = []  # Store losses for monitoring
 
         self.qualities = collections.defaultdict(list)
-
 
         if device is None:
             self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         else:
             self.device = device
 
-
     def train(self):
         ''' Do one iteration of QLA
         '''
-        self.iteration += 1
+
+        self.episodes += 1
         self.env.reset()
         self.find_agent()
         v = self.traverse_tree()
         self._decay_epsilon()
 
+        if self.rb.size() > self.batch_size:
+
+            for _ in range(self.num_train_steps):
+                loss = self.train_step(self.rb.sample(self.batch_size), self.model, self.tgt, self.num_actions)
+                self.losses.append(loss.item())  # Convert the loss to a scalar and store it
+
+            if self.episodes % self.tgt_update_freq == 0:
+                self.update_tgt_model(self.model, self.tgt)
+
+            # Print or log the average loss
+            return loss.item()
+
+    def find_agent(self):
+        ''' Find if the agent starts first or second
+        '''
+        agents = self.env.get_agents()
+        for id, agent in enumerate(agents):
+            if isinstance(agent, MYDQNAgent):
+                self.agent_id = id
+                break
+
+    def get_avg_loss(self):
+        avg_loss = sum(self.losses) / len(self.losses)  # Calculate the average loss
+        return avg_loss
+
     def _decay_epsilon(self):
         ''' Decay epsilon
         '''
         if self.epsilon > self.epsilon_min:
-            self.epsilon = max(self.epsilon_min, self.epsilon * self.decay_factor)
+            self.epsilon = max(self.epsilon_min, self.epsilon ** self.eps_decay)
 
     def traverse_tree(self):
         ''' Traverse the game tree:
@@ -112,25 +146,61 @@ class MYDQNAgent:
         if current_player == self.agent_id:
             card_obs, state_obs, legal_actions = self.get_state(current_player)
             rewards = np.zeros(len(legal_actions))
-            cur_state = tuple(card_obs, state_obs)
-            i = 0
+            cur_state = (card_obs, state_obs)
 
-            # if first time we encounter state initialize qualities or get the previous policy
-            self.action_probs(card_obs, state_obs, self.policy, self.qualities)
+            obs1, obs2 = self.prepare_data(card_obs, state_obs)
+            with torch.no_grad():
+                qvals = self.model(obs1, obs2)
+                #print(qvals)
+                #print(legal_actions)
+                qvals = self.remove_illegal(qvals, legal_actions)
+                #print(qvals)
 
-            for i, action in enumerate(legal_actions, start=0):
-                # Keep traversing the child state
-                self.env.step(action)
-                next_state, reward, done = self.traverse_tree()
-                self.env.step_back()
+            if np.random.rand() < self.epsilon:
+                # explore
+                action = np.random.choice(len(qvals), size=1)[0]
+                print(action)
+            else:
+                # action with highest Q value
+                action = np.argmax(qvals)
 
-                trans = Trans(cur_state, action, reward, next_state, done)
-                self.rb.insert(trans)
+            self.env.step(action)
+            next_state, reward, done = self.traverse_tree()
+            self.env.step_back()
 
-                rewards[i] = reward
+            trans = Trans(cur_state, action, reward, next_state, done)
+            self.rb.insert(trans)
 
-        return cur_state, rewards.mean(), False
+        return cur_state, rewards, False
 
+    def remove_illegal(self, qvals, legal_actions):
+        """turn back to np array and remove illegal actions
+        """
+
+        qvals = qvals.numpy()
+        modified_qvals = qvals.copy()
+
+        # Set the Q-values of illegal actions to negative infinity
+        illegal_actions = [i for i in range(len(qvals)) if i not in legal_actions]
+        modified_qvals[illegal_actions] = -np.inf
+
+        return modified_qvals
+
+    def prepare_data(self, obs1, obs2):
+        # Convert to float if not already
+        obs1_tensor = torch.from_numpy(obs1).float()
+        obs2_tensor = torch.from_numpy(obs2).float()
+        # Add a batch dimension of size 1
+        obs1_tensor = obs1_tensor.unsqueeze(0)
+        obs2_tensor = obs2_tensor.unsqueeze(0)
+
+        # Flatten the tensor into a 1D vector
+        obs1_flattened = obs1_tensor.view(1, -1)
+        obs2_flattened = obs2_tensor.view(1, -1)
+
+        print(obs1_flattened.shape)
+
+        return obs1_flattened, obs2_flattened
 
 
 
@@ -147,8 +217,7 @@ class MYDQNAgent:
                 legal_actions (list): Indices of legal actions
         '''
         state = self.env.get_state(player_id)
-        return state['card_tensor'].tostring(), state['action_tensor'].tostring(), list(state['legal_actions'].keys())
-
+        return state['card_tensor'], state['action_tensor'], list(state['legal_actions'].keys())
 
     """Pure NN"""
 
@@ -161,6 +230,33 @@ class MYDQNAgent:
         q_vals = self.model(card_obs, action_obs)
 
         return q_vals.max(-1)[1]
+
+    def train_step(self, state_transitions, model, tgt, num_actions):
+        # Unpack the state transitions
+        cur_state_card_trans = [s.state[0] for s in state_transitions]
+        cur_state_action_trans = [s.state[1] for s in state_transitions]
+
+        next_state_card_trans = [s.next_state[0] for s in state_transitions]
+        next_state_action_trans = [s.next_state[1] for s in state_transitions]
+
+        cur_states1 = torch.stack([torch.Tensor(state) for state in cur_state_card_trans])
+        cur_states2 = torch.stack([torch.Tensor(state) for state in cur_state_action_trans])
+        rewards = torch.stack(torch.Tensor(s.reward) for s in state_transitions)
+        mask = torch.stack([torch.Tensor([0]) if s.done else torch.Tensor([1]) for s in state_transitions])
+        next_states1 = torch.stack([torch.Tensor(state) for state in next_state_card_trans])
+        next_states2 = torch.stack([torch.Tensor(state) for state in next_state_action_trans])
+        actions = [s.action for s in state_transitions]
+
+        with torch.no_grad():
+            qvals_next = tgt(next_states1, next_states2).max(-1)[0]  # (N, num_actions)
+
+        model.opt.zero_grad()
+        qvals = model(cur_states1, cur_states2)  # (N, num_actions)
+        one_hot_actions = F.one_hot(torch.LongTensor(actions), num_actions)
+        loss = (rewards + mask[:, 0]*qvals_next - torch.sum(qvals * one_hot_actions, dim=-1)).mean()
+        loss.backward()
+        model.opt.step()
+        return loss
 
 class Model(nn.Module):
     """Our network"""
@@ -192,6 +288,8 @@ class Model(nn.Module):
         self.opt = optim.Adam(self.parameters(), lr=self.lr)
 
     def forward(self, obs1, obs2):
+        print(obs1.shape)
+
         # Process each observation through its respective pathway
         obs1_out = self.layer_path1(obs1)
         obs2_out = self.layer_path2(obs2)
@@ -201,33 +299,13 @@ class Model(nn.Module):
 
         # Pass the combined features through the final layer
         actions = self.final_layer(combined_features)
-        return actions
-
-    def train_step(self, state_transitions, model, tgt, num_actions):
-        cur_states = torch.stack(torch.Tensor(s.state) for s in state_transitions)
-        rewards = torch.stack(torch.Tensor(s.reward) for s in state_transitions)
-        mask = torch.stack([torch.Tensor([0]) if s.done else torch.Tensor([1]) for s in state_transitions])
-        next_states = torch.stack([torch.Tensor(s.next_state) for s in state_transitions])
-        actions = [s.action for s in state_transitions]
-
-        with torch.no_grad():
-            qvals_next = tgt(next_states).max(-1)[0]  # (N, num_actions)
-
-        model.opt.zero_grad()
-        qvals = model(cur_states)  # (N, num_actions)
-        one_hot_actions = F.one_hot(torch.LongTensor(actions), num_actions)
-        loss = (rewards + mask[:, 0]*qvals_next - torch.sum(qvals * one_hot_actions, dim=-1)).mean
-        loss.backward()
-        model.opt.step()
-        return loss
-
-
+        return actions[0]
 
 
 class ReplayBuffer:
     """ Our replay buffer
     """
-    def __init__(self, buffer_size=1000000):
+    def __init__(self, buffer_size=200000):
         self.buffer_size = buffer_size
         self.buffer = deque(maxlen=buffer_size)
 
@@ -237,6 +315,11 @@ class ReplayBuffer:
     def sample(self, num_samples):
         assert num_samples <= len(self.buffer)
         return sample(self.buffer, num_samples)
+
+    def size(self):
+        return len(self.buffer)
+
+
 
 
 
