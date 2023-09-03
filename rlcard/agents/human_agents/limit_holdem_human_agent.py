@@ -26,6 +26,15 @@ class HumanAgent(object):
         '''
         _print_state(state['raw_obs'], state['action_record'])
         action = int(input('>> You choose action (integer): '))
+        if 'legal_actions' in state:
+            # Access 'legal_actions' if it exists in the dictionary
+            legal_actions = state['legal_actions']
+
+            # Perform actions or checks related to 'legal_actions' here
+            # ...
+        else:
+            # Handle the case where 'legal_actions' is not present in the dictionary
+            print("'legal_actions' not found in the dictionary")
         while action < 0 or action >= len(state['legal_actions']):
             print('Action illegal...')
             action = int(input('>> Re-choose action (integer): '))
