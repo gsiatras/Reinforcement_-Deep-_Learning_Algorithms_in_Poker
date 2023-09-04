@@ -26,6 +26,10 @@ class Logger(object):
         self.csv3_path = os.path.join(self.log_dir, 'performance3.csv')
         self.fig3_path = os.path.join(self.log_dir, 'fig3.png')
 
+        self.txt4_path = os.path.join(self.log_dir, 'log4.txt')
+        self.csv4_path = os.path.join(self.log_dir, 'performance4.csv')
+        self.fig4_path = os.path.join(self.log_dir, 'fig4.png')
+
         if not os.path.exists(self.log_dir):
             os.makedirs(self.log_dir)
 
@@ -46,6 +50,12 @@ class Logger(object):
         fieldnames = ['episode', 'avg_loss']
         self.writer3 = csv.DictWriter(self.csv3_file, fieldnames=fieldnames)
         self.writer3.writeheader()
+
+        self.txt4_file = open(self.txt4_path, 'w')
+        self.csv4_file = open(self.csv4_path, 'w')
+        fieldnames = ['episode', 'epsilon']
+        self.writer4 = csv.DictWriter(self.csv4_file, fieldnames=fieldnames)
+        self.writer4.writeheader()
         return self
 
     def log(self, text):
@@ -85,7 +95,7 @@ class Logger(object):
         self.log('  winrate       |  ' + str(winrate))
         self.log('----------------------------------------')
 
-    def log_performance2(self, episode, reward, winrate, avg_loss):
+    def log_performance2(self, episode, reward, winrate, avg_loss, epsilon):
         ''' Log a point in the curve
         Args:
             episode (int): the episode of the current point
@@ -94,12 +104,14 @@ class Logger(object):
         self.writer.writerow({'episode': episode, 'reward': reward})
         self.writer2.writerow({'episode': episode, 'winrate': winrate})
         self.writer3.writerow({'episode': episode, 'avg_loss': avg_loss})
+        self.writer4.writerow({'episode': episode, 'epsilon': epsilon})
         print('')
         self.log('----------------------------------------')
         self.log('  episode      |  ' + str(episode))
         self.log('  reward       |  ' + str(reward))
         self.log('  winrate      |  ' + str(winrate))
         self.log('  loss         |  ' + str(avg_loss))
+        self.log('  epsilon      |  ' + str(epsilon))
         self.log('----------------------------------------')
 
     def __exit__(self, type, value, traceback):
@@ -115,4 +127,8 @@ class Logger(object):
             self.txt3_file.close()
         if self.csv3_path is not None:
             self.csv3_file.close()
+            if self.txt4_path is not None:
+                self.txt4_file.close()
+            if self.csv4_path is not None:
+                self.csv4_file.close()
         print('\nLogs saved in', self.log_dir)

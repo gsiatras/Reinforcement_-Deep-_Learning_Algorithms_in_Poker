@@ -86,6 +86,29 @@ class Env(object):
 
         return self._extract_state(next_state), player_id
 
+    def step2(self, action, legal_actions, raw_action=False):
+        ''' Step forward
+
+        Args:
+            action (int): The action taken by the current player
+            raw_action (boolean): True if the action is a raw action
+
+        Returns:
+            (tuple): Tuple containing:
+
+                (dict): The next state
+                (int): The ID of the next player
+        '''
+        if not raw_action:
+            action = self._decode_action(action)
+
+        self.timestep += 1
+        # Record the action for human interface
+        self.action_recorder.append((self.get_player_id(), action, self.game.round_counter, legal_actions))
+        next_state, player_id = self.game.step(action)
+
+        return self._extract_state(next_state), player_id
+
     def step_back(self):
         ''' Take one step backward.
 
@@ -145,9 +168,9 @@ class Env(object):
                 action, _ = self.agents[player_id].eval_step(state)
             else:
                 action = self.agents[player_id].step(state)
-
+            legal_actions = list(state['legal_actions'].keys())
             # Environment steps
-            next_state, next_player_id = self.step(action, self.agents[player_id].use_raw)
+            next_state, next_player_id = self.step2(action, legal_actions, self.agents[player_id].use_raw)
             # Save action
             trajectories[player_id].append(action)
 

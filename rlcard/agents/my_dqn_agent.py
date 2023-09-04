@@ -34,15 +34,15 @@ class MYDQNAgent:
     def __init__(self,
                  env,
                  model_path='./Dqn_model',
-                 epsilon_decay=0.995,
+                 epsilon_decay=0.9999,
                  epsilon_start=1.0,
                  epsilon_end=0.01,
                  card_obs_shape=(6, 4, 13),
                  action_obs_shape=(24, 3, 4),
-                 learning_rate=0.00005,
+                 learning_rate=0.005,
                  num_actions=4,
                  batch_size=64,
-                 tgt_update_freq=500,
+                 tgt_update_freq=700,
                  train_steps=1,
                  device=None):
 
@@ -51,7 +51,7 @@ class MYDQNAgent:
         self.model_path = model_path
         self.eps_decay = epsilon_decay
         self.epsilon = epsilon_start
-        self.epsilon_end = epsilon_end
+        self.epsilon_min = epsilon_end
         self.card_obs_shape = card_obs_shape
         self.action_obs_shape = action_obs_shape
         self.alpha = learning_rate
@@ -59,13 +59,14 @@ class MYDQNAgent:
         self.num_train_steps = train_steps
         self.batch_size = batch_size
         self.agent_id = 0
+        self.use_raw = False
 
         self.model = Model(card_obs_shape, action_obs_shape, num_actions, self.alpha)
         self.tgt = Model(card_obs_shape, action_obs_shape, num_actions, self.alpha)
 
-        self.rb = ReplayBuffer
+        self.rb = ReplayBuffer()
         self.episodes = 0
-        losses = []  # Store losses for monitoring
+        self.losses = []  # Store losses for monitoring
 
         self.qualities = collections.defaultdict(list)
 
@@ -74,14 +75,15 @@ class MYDQNAgent:
         else:
             self.device = device
 
+
     def train(self):
         ''' Do one iteration of QLA
         '''
-
+        np.random.seed(2)
         self.episodes += 1
         self.env.reset()
         self.find_agent()
-        v = self.traverse_tree()
+        self.traverse_tree()
         self._decay_epsilon()
 
         if self.rb.size() > self.batch_size:
@@ -106,14 +108,17 @@ class MYDQNAgent:
                 break
 
     def get_avg_loss(self):
-        avg_loss = sum(self.losses) / len(self.losses)  # Calculate the average loss
-        return avg_loss
+        if len(self.losses) > 0:
+            avg_loss = sum(self.losses) / len(self.losses)  # Calculate the average loss
+        else:
+            avg_loss = 0
+        return avg_loss, self.epsilon
 
     def _decay_epsilon(self):
         ''' Decay epsilon
         '''
         if self.epsilon > self.epsilon_min:
-            self.epsilon = max(self.epsilon_min, self.epsilon ** self.eps_decay)
+            self.epsilon = max(self.epsilon_min, self.epsilon * self.eps_decay)
 
     def traverse_tree(self):
         ''' Traverse the game tree:
@@ -124,13 +129,14 @@ class MYDQNAgent:
         Then return the Qvalue of the best or a random state according to the epsilon (off policy)
         Change the policy according to the new Q values
         '''
-
+        current_player = self.env.get_player_id()
         # Check if the game is over to return the chips earned(reward of the game)
         if self.env.is_over():
+            card_obs, action_obs, legal_actions = self.get_state(current_player)
+            state = (card_obs, action_obs)
             chips = self.env.get_payoffs()
-            return None, chips[self.agent_id], True
+            return state, chips[self.agent_id], True
 
-        current_player = self.env.get_player_id()
         # other agent move
         if not current_player == self.agent_id:
             state = self.env.get_state(current_player)
@@ -138,17 +144,17 @@ class MYDQNAgent:
             action = self.env.agents[current_player].step(state)
 
             # Keep traversing the child state
-            self.env.step(action)
+            legal_actions = list(state['legal_actions'].keys())
+            self.env.step2(action, legal_actions)
             next_state, reward, done = self.traverse_tree()
             self.env.step_back()
             return next_state, reward, done
 
         if current_player == self.agent_id:
-            card_obs, state_obs, legal_actions = self.get_state(current_player)
-            rewards = np.zeros(len(legal_actions))
-            cur_state = (card_obs, state_obs)
+            card_obs, action_obs, legal_actions = self.get_state(current_player)
+            cur_state = (card_obs, action_obs)
 
-            obs1, obs2 = self.prepare_data(card_obs, state_obs)
+            obs1, obs2 = self.prepare_data(card_obs, action_obs)
             with torch.no_grad():
                 qvals = self.model(obs1, obs2)
                 #print(qvals)
@@ -158,20 +164,22 @@ class MYDQNAgent:
 
             if np.random.rand() < self.epsilon:
                 # explore
-                action = np.random.choice(len(qvals), size=1)[0]
-                print(action)
+                action = np.random.choice(legal_actions)
+                #print(action)
             else:
                 # action with highest Q value
                 action = np.argmax(qvals)
 
-            self.env.step(action)
+            #print(action, legal_actions)
+
+            self.env.step2(action, legal_actions)
             next_state, reward, done = self.traverse_tree()
             self.env.step_back()
 
             trans = Trans(cur_state, action, reward, next_state, done)
             self.rb.insert(trans)
 
-        return cur_state, rewards, False
+        return cur_state, reward, False
 
     def remove_illegal(self, qvals, legal_actions):
         """turn back to np array and remove illegal actions
@@ -198,11 +206,9 @@ class MYDQNAgent:
         obs1_flattened = obs1_tensor.view(1, -1)
         obs2_flattened = obs2_tensor.view(1, -1)
 
-        print(obs1_flattened.shape)
+        #print(obs1_flattened.shape)
 
         return obs1_flattened, obs2_flattened
-
-
 
 
     def get_state(self, player_id):
@@ -232,6 +238,7 @@ class MYDQNAgent:
         return q_vals.max(-1)[1]
 
     def train_step(self, state_transitions, model, tgt, num_actions):
+        #print(state_transitions)
         # Unpack the state transitions
         cur_state_card_trans = [s.state[0] for s in state_transitions]
         cur_state_action_trans = [s.state[1] for s in state_transitions]
@@ -241,7 +248,9 @@ class MYDQNAgent:
 
         cur_states1 = torch.stack([torch.Tensor(state) for state in cur_state_card_trans])
         cur_states2 = torch.stack([torch.Tensor(state) for state in cur_state_action_trans])
-        rewards = torch.stack(torch.Tensor(s.reward) for s in state_transitions)
+        rewards = [s.reward for s in state_transitions]
+        #print(rewards)
+        rewards = torch.tensor(rewards, dtype=torch.int32)
         mask = torch.stack([torch.Tensor([0]) if s.done else torch.Tensor([1]) for s in state_transitions])
         next_states1 = torch.stack([torch.Tensor(state) for state in next_state_card_trans])
         next_states2 = torch.stack([torch.Tensor(state) for state in next_state_action_trans])
@@ -253,10 +262,36 @@ class MYDQNAgent:
         model.opt.zero_grad()
         qvals = model(cur_states1, cur_states2)  # (N, num_actions)
         one_hot_actions = F.one_hot(torch.LongTensor(actions), num_actions)
-        loss = (rewards + mask[:, 0]*qvals_next - torch.sum(qvals * one_hot_actions, dim=-1)).mean()
-        loss.backward()
+        loss = (rewards + mask[:, 0]*qvals_next - torch.sum(qvals * one_hot_actions, dim=-1)) ** 2
+        mean_loss = loss.mean()
+        #loss = model.mse_loss(qvals, qvals_next)
+        mean_loss.backward()
         model.opt.step()
-        return loss
+        return mean_loss
+
+    def eval_step(self, state):
+        card_obs = state['card_tensor']
+        action_obs = state['action_tensor']
+        legal_actions = list(state['legal_actions'].keys())
+
+        obs1, obs2 = self.prepare_data(card_obs, action_obs)
+        with torch.no_grad():
+            qvals = self.tgt(obs1, obs2)
+            qvals = self.remove_illegal(qvals, legal_actions)
+
+        action = np.argmax(qvals)
+
+        info = {}
+        info['qvals'] = {state['raw_legal_actions'][i]: float(qvals[list(state['legal_actions'].keys())[i]]) for i in
+                         range(len(state['legal_actions']))}
+
+        return action, info
+
+
+    def step(self, state):
+        '''step = eval.step
+        '''
+        return self.eval_step(state)
 
 class Model(nn.Module):
     """Our network"""
@@ -286,9 +321,10 @@ class Model(nn.Module):
         )
 
         self.opt = optim.Adam(self.parameters(), lr=self.lr)
+        self.mse_loss = nn.MSELoss(reduction='mean')
 
     def forward(self, obs1, obs2):
-        print(obs1.shape)
+        #print(obs1.shape)
 
         # Process each observation through its respective pathway
         obs1_out = self.layer_path1(obs1)
@@ -305,7 +341,7 @@ class Model(nn.Module):
 class ReplayBuffer:
     """ Our replay buffer
     """
-    def __init__(self, buffer_size=200000):
+    def __init__(self, buffer_size=10000):
         self.buffer_size = buffer_size
         self.buffer = deque(maxlen=buffer_size)
 

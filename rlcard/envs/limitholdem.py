@@ -56,8 +56,9 @@ class LimitholdemEnv(Env):
             observation (list): combine the player's score and dealer's observable score for observation
         '''
         card_tensor = np.zeros((6, 4, 13))
-        action_tensor = self.action_state.copy()
+        action_tensor = np.zeros((24, 3, 4))
         extracted_state = {}
+        legal_actions1 = OrderedDict({self.actions.index(a): None for a in state['legal_actions']})
 
         # Handling the card tensor
         hand = state['hand']
@@ -94,39 +95,63 @@ class LimitholdemEnv(Env):
 
         self.card_state = card_tensor[self.game.game_pointer]
 
-        # Handling the action tensor
-        round = self.game.round_counter
+        # # Handling the action tensor
+        # cur_round = self.game.round_counter
+        # z1 = self.last_round * 6 + self.cont_actions
+        # print(self.cont_actions)
+        # assert not (z1 == 24 and self.last_round < 4), (z1, cur_round, self.last_round, self.cont_actions, action_tensor, card_tensor)card_tensor
 
-        z1 = self.last_round * 6 + self.cont_actions
 
         """action_tensor[action_number x round][player//legal][action]"""
-        a = len(self.action_recorder)
-        if a > 0 and self.last_round < 4:
-            # get action number
-            # get legal actions
-            for i in self.previous_legal_actions:
-                action_tensor[z1][2][i] = 1
+        # a = len(self.action_recorder)
+        # if a > 0 and self.last_round < 4:
+        #     # get action number
+        #     # get legal actions
+        #     for i in self.previous_legal_actions:
+        #         action_tensor[z1][2][i] = 1
+        #
+        #     last_action = self.action_recorder[a - 1][1]
+        #     player = self.action_recorder[a - 1][0]
+        #     action_tensor[z1][player][self.actions.index(last_action)] = 1
+        #     self.cont_actions += 1
+        #
+        # if cur_round != self.last_round:
+        #     print("check")
+        #     self.last_round = cur_round
+        #     self.cont_actions = 0
+        #
+        # self.action_state = action_tensor
+        #
+        # legal_actions = OrderedDict({self.actions.index(a): None for a in state['legal_actions']})
+        # self.previous_legal_actions = legal_actions
 
-            last_action = self.action_recorder[a - 1][1]
-            player = self.action_recorder[a - 1][0]
-            action_tensor[z1][player][self.actions.index(last_action)] = 1
-            self.cont_actions += 1
+        con_actions = 0
+        last_round = 0
+        for player_id, action, round_counter, legal_actions in self.action_recorder:
+            if last_round != round_counter:
+                con_actions = 0
+            idx = round_counter * 6 + con_actions
+            #print(idx, player_id, action)
+            action_tensor[idx][player_id][self.actions.index(action)] = 1
+            for a in legal_actions:
+                action_tensor[idx][2][a] = 1
+            con_actions += 1
+            last_round = round_counter
 
-            if round != self.last_round:
-                self.last_round = round
-                self.cont_actions = 0
 
-        self.action_state = action_tensor
 
-        legal_actions = OrderedDict({self.actions.index(a): None for a in state['legal_actions']})
-        self.previous_legal_actions = legal_actions
+
+        # print("======================================================================")
+        # print(action_tensor)
+        # print("======================================================================")
+        # print(card_tensor)
 
         extracted_state['card_tensor'] = card_tensor
         extracted_state['action_tensor'] = action_tensor
         extracted_state['raw_obs'] = state
         extracted_state['raw_legal_actions'] = [a for a in state['legal_actions']]
         extracted_state['action_record'] = self.action_recorder
-        extracted_state['legal_actions'] = legal_actions
+        extracted_state['legal_actions'] = legal_actions1
 
         return extracted_state
 

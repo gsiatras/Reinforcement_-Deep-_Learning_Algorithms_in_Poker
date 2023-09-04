@@ -489,7 +489,7 @@ def determine_winner_straight(hands, all_players, potential_winner_index):
     '''
     highest_ranks = []
     for hand in hands:
-        highest_rank = hand.STRING_TO_RANK[hand.best_three[-1][1]]  # cards are sorted in ascending order
+        highest_rank = hand.STRING_TO_RANK[hand.best_five[-1][1]]  # cards are sorted in ascending order
         highest_ranks.append(highest_rank)
     max_highest_rank = max(highest_ranks)
     for i_player in range(len(highest_ranks)):
@@ -514,8 +514,8 @@ def determine_winner_four_of_a_kind(hands, all_players, potential_winner_index):
     '''
     ranks = []
     for hand in hands:
-        rank_1 = hand.STRING_TO_RANK[hand.best_three[-1][1]]  # rank of the four of a kind
-        rank_2 = hand.STRING_TO_RANK[hand.best_three[0][1]]  # rank of the kicker
+        rank_1 = hand.STRING_TO_RANK[hand.best_five[-1][1]]  # rank of the four of a kind
+        rank_2 = hand.STRING_TO_RANK[hand.best_five[0][1]]  # rank of the kicker
         ranks.append((rank_1, rank_2))
     max_rank = max(ranks)
     for i, rank in enumerate(ranks):
