@@ -1,4 +1,3 @@
-import collections
 import os
 import random
 import numpy as np
@@ -6,15 +5,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from collections import namedtuple
 from collections import deque
-from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 from random import sample
 from rlcard.utils.utils import *
-
-from rlcard.utils.utils import remove_illegal
+import pickle
 
 
 @dataclass
@@ -26,7 +22,13 @@ class Trans:
     done: bool
 
 
-class MYDQNAgent:
+# def cls(replay_memory_size, replay_memory_init_size, update_target_estimator_every, discount_factor, epsilon_start,
+#         epsilon_end, epsilon_decay_steps, batch_size, num_actions, state_shape, train_every, mlp_layers, learning_rate,
+#         device, save_path, save_every):
+#     pass
+
+
+class MYDQNAgent(object):
     '''
     Approximate clone of rlcard.agents.dqn_agent.DQNAgent
     that depends on PyTorch instead of Tensorflow
@@ -44,6 +46,7 @@ class MYDQNAgent:
                  batch_size=64,
                  tgt_update_freq=700,
                  train_steps=1,
+                 buffer_size = 10000,
                  device=None):
 
         self.num_actions = num_actions
@@ -54,21 +57,20 @@ class MYDQNAgent:
         self.epsilon_min = epsilon_end
         self.card_obs_shape = card_obs_shape
         self.action_obs_shape = action_obs_shape
-        self.alpha = learning_rate
+        self.learning_rate = learning_rate
         self.tgt_update_freq = tgt_update_freq
         self.num_train_steps = train_steps
         self.batch_size = batch_size
         self.agent_id = 0
         self.use_raw = False
+        self.buffer_size = buffer_size
+        self.model = Model(card_obs_shape, action_obs_shape, num_actions, self.learning_rate)
+        self.tgt = Model(card_obs_shape, action_obs_shape, num_actions, self.learning_rate)
 
-        self.model = Model(card_obs_shape, action_obs_shape, num_actions, self.alpha)
-        self.tgt = Model(card_obs_shape, action_obs_shape, num_actions, self.alpha)
-
-        self.rb = ReplayBuffer()
+        self.rb = ReplayBuffer(self.buffer_size)
         self.episodes = 0
         self.losses = []  # Store losses for monitoring
-
-        self.qualities = collections.defaultdict(list)
+        self.start_pos = []
 
         if device is None:
             self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -79,7 +81,6 @@ class MYDQNAgent:
     def train(self):
         ''' Do one iteration of QLA
         '''
-        np.random.seed(2)
         self.episodes += 1
         self.env.reset()
         self.find_agent()
@@ -106,6 +107,7 @@ class MYDQNAgent:
             if isinstance(agent, MYDQNAgent):
                 self.agent_id = id
                 break
+        self.start_pos.append(self.agent_id)
 
     def get_avg_loss(self):
         if len(self.losses) > 0:
@@ -142,7 +144,6 @@ class MYDQNAgent:
             state = self.env.get_state(current_player)
             # other agent move
             action = self.env.agents[current_player].step(state)
-
             # Keep traversing the child state
             legal_actions = list(state['legal_actions'].keys())
             self.env.step2(action, legal_actions)
@@ -293,6 +294,81 @@ class MYDQNAgent:
         '''
         return self.eval_step(state)
 
+
+    def save(self, filename='checkpoint_my_dqn.pt'):
+        """
+        Save relevant parameters of the MYDQNAgent instance to a file.
+        """
+        agent_params = {
+            'epsilon': self.epsilon,
+            'model_state_dict': self.model.state_dict(),
+            'tgt_state_dict': self.tgt.state_dict(),
+            'rb_buffer': self.rb.buffer,
+            'episodes': self.episodes,
+            'losses': self.losses,
+            "agent_id": self.agent_id,
+
+            "num_actions": self.num_actions,
+            "env": self.env,
+            "model_path": self.model_path,
+            "epsilon_decay": self.eps_decay,
+            "epsilon_min": self.epsilon_min,
+            "card_obs_shape": self.card_obs_shape,
+            "action_obs_shape": self.action_obs_shape,
+            "learning_rate": self.learning_rate,
+            "tgt_update_freq": self.tgt_update_freq,
+            "num_train_steps": self.num_train_steps,
+            "buffer_size": self.buffer_size,
+            "batch_size": self.batch_size,
+            "use_raw": self.use_raw,
+            "device": self.device
+        }
+
+        if not os.path.exists(self.model_path):
+            os.makedirs(self.model_path)
+
+        checkpoint_file = open(os.path.join(self.model_path, filename), 'wb')
+        pickle.dump(agent_params, checkpoint_file)
+        checkpoint_file.close()
+
+    @classmethod
+    def load(cls, model_path, filename='checkpoint_my_dqn.pt'):
+        try:
+            file = open(os.path.join(model_path, filename), 'rb')
+            agent_params = pickle.load(file)
+            file.close()
+            print("\nINFO - Restoring model from checkpoint...")
+
+            agent_instance = cls(
+                env=agent_params["env"],
+                model_path=agent_params["model_path"],
+                epsilon_decay=agent_params["epsilon_decay"],
+                epsilon_start=agent_params["epsilon"],
+                epsilon_end=agent_params["epsilon_min"],
+                card_obs_shape=agent_params["card_obs_shape"],
+                action_obs_shape=agent_params["action_obs_shape"],
+                learning_rate=agent_params["learning_rate"],
+                num_actions=agent_params["num_actions"],
+                batch_size=agent_params["batch_size"],
+                tgt_update_freq=agent_params["tgt_update_freq"],
+                train_steps=agent_params["num_train_steps"],
+                buffer_size=agent_params["buffer_size"],
+                device=agent_params["device"]
+            )
+
+            agent_instance.losses = agent_params["losses"]
+            agent_instance.agent_id = agent_params["agent_id"]
+            agent_instance.episodes = agent_params["episodes"]
+            agent_instance.tgt.load_state_dict(agent_params['tgt_state_dict'])
+            agent_instance.model.load_state_dict(agent_params['model_state_dict'])
+            agent_instance.rb.buffer = agent_params['rb_buffer']
+
+            return agent_instance
+        except FileNotFoundError:
+            print(f"\nINFO - No checkpoint file '{filename}' found. Creating a new agent.")
+            return None
+
+
 class Model(nn.Module):
     """Our network"""
     def __init__(self, card_obs_shape, action_obs_shape, num_actions, learning_rate=0.0005):
@@ -308,16 +384,22 @@ class Model(nn.Module):
             nn.Flatten(),
             nn.Linear(input_dim1, 512),
             nn.ReLU(),
+            nn.Linear(512, 512),
+            nn.ReLU(),
         )
 
         self.layer_path2 = torch.nn.Sequential(
             nn.Flatten(),
             nn.Linear(input_dim2, 512),
             nn.ReLU(),
+            nn.Linear(512, 512),
+            nn.ReLU(),
         )
 
         self.final_layer = nn.Sequential(
-            nn.Linear(2 * 512, num_actions),
+            nn.Linear(2 * 512, 512),
+            nn.ReLU(),
+            nn.Linear(512, num_actions),
         )
 
         self.opt = optim.Adam(self.parameters(), lr=self.lr)
@@ -354,6 +436,8 @@ class ReplayBuffer:
 
     def size(self):
         return len(self.buffer)
+
+
 
 
 

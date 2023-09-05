@@ -27,12 +27,16 @@ class Hand:
         '''
         return self.best_five
 
-    def _sort_cards(self):
+    def sort_cards(self):
         '''
         Sort all the seven cards ascendingly according to RANK_LOOKUP
         '''
         self.all_cards = sorted(
             self.all_cards, key=lambda card: self.RANK_LOOKUP.index(card[1]))
+
+    def agent_cards(self):
+        self.cards_by_rank, self.product = self._getcards_by_rank(
+            self.all_cards)
 
     def evaluateHand(self):
         """
@@ -43,47 +47,47 @@ class Hand:
             raise Exception(
                 "There are not enough 7 cards in this hand, quit evaluation now ! ")
 
-        self._sort_cards()
+        self.sort_cards()
         self.cards_by_rank, self.product = self._getcards_by_rank(
             self.all_cards)
 
-        if self._has_straight_flush():
+        if self.has_straight_flush():
             self.category = 9
             #Straight Flush
-        elif self._has_four():
+        elif self.has_four():
             self.category = 8
             #Four of a Kind
             self.best_five = self._get_Four_of_a_kind_cards()
-        elif self._has_fullhouse():
+        elif self.has_fullhouse():
             self.category = 7
             #Full house
             self.best_five = self._get_Fullhouse_cards()
-        elif self._has_flush():
+        elif self.has_flush():
             self.category = 6
             #Flush
             i = len(self.flush_cards)
             self.best_five = [card for card in self.flush_cards[i-5:i]]
-        elif self._has_straight(self.all_cards):
+        elif self.has_straight(self.all_cards):
             self.category = 5
             #Straight
-        elif self._has_three():
+        elif self.has_three():
             self.category = 4
             #Three of a Kind
             self.best_five = self._get_Three_of_a_kind_cards()
-        elif self._has_two_pairs():
+        elif self.has_two_pairs():
             self.category = 3
             #Two Pairs
             self.best_five = self._get_Two_Pair_cards()
-        elif self._has_pair():
+        elif self.has_pair():
             self.category = 2
             #One Pair
             self.best_five = self._get_One_Pair_cards()
-        elif self._has_high_card():
+        elif self.has_high_card():
             self.category = 1
             #High Card
             self.best_five = self._get_High_cards()
 
-    def _has_straight_flush(self):
+    def has_straight_flush(self):
         '''
         Check the existence of straight_flush cards
         Returns:
@@ -122,7 +126,7 @@ class Hand:
                 return flush_cards
         return []
 
-    def _has_flush(self):
+    def has_flush(self):
         '''
         Check the existence of flush cards
         Returns:
@@ -134,7 +138,7 @@ class Hand:
         else:
             return False
 
-    def _has_straight(self, all_cards):
+    def has_straight(self, all_cards):
         '''
         Check the existence of straight cards
         Returns:
@@ -179,6 +183,28 @@ class Hand:
         for i_last in range(len(ranks) - 1, 3, -1):
             if ranks[i_last-4] + 4 == ranks[i_last]:  # works because ranks are unique and sorted in ascending order
                 return Cards[i_last-4:i_last+1]
+        return []
+
+    def _get_straight_cards2(self, Cards):
+        '''
+        Pick straight cards
+        Returns:
+            (list): the straight cards
+        '''
+        ranks = [self.STRING_TO_RANK[c[1]] for c in Cards]
+
+        highest_card = Cards[-1]
+        if highest_card[1] == 'A':
+            Cards.insert(0, highest_card)
+            ranks.insert(0, 1)
+
+        for i_start in range(len(ranks) - 4):
+            # Check for a straight starting from i_start
+            is_straight = all(ranks[i_start + j] + j == ranks[i_start] for j in range(5))
+
+            if is_straight:
+                return Cards[i_start:i_start + 5]
+
         return []
 
     def _getcards_by_rank(self, all_cards):
@@ -230,7 +256,7 @@ class Hand:
         card_group.append(card_group_element)
         return card_group, product
 
-    def _has_four(self):
+    def has_four(self):
         '''
         Check the existence of four cards
         Returns:
@@ -242,7 +268,7 @@ class Hand:
         else:
             return False
 
-    def _has_fullhouse(self):
+    def has_fullhouse(self):
         '''
         Check the existence of fullhouse cards
         Returns:
@@ -254,7 +280,7 @@ class Hand:
         else:
             return False
 
-    def _has_three(self):
+    def has_three(self):
         '''
         Check the existence of three cards
         Returns:
@@ -266,7 +292,7 @@ class Hand:
         else:
             return False
 
-    def _has_two_pairs(self):
+    def has_two_pairs(self):
         '''
         Check the existence of 2 pair cards
         Returns:
@@ -278,7 +304,7 @@ class Hand:
         else:
             return False
 
-    def _has_pair(self):
+    def has_pair(self):
         '''
         Check the existence of 1 pair cards
         Returns:
@@ -290,7 +316,7 @@ class Hand:
         else:
             return False
 
-    def _has_high_card(self):
+    def has_high_card(self):
         '''
         Check the existence of high cards
         Returns:

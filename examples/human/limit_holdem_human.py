@@ -3,17 +3,44 @@
 
 import rlcard
 from rlcard.agents import LimitholdemHumanAgent as HumanAgent
-from rlcard.agents import RandomAgent
+from rlcard.agents import RandomAgent, MYDQNAgent
 from rlcard.utils.utils import print_card
-
+import os
 # Make environment
 env = rlcard.make('limit-holdem')
 human_agent = HumanAgent(env.num_actions)
 human_agent2 = HumanAgent(env.num_actions)
 agent_0 = RandomAgent(num_actions=env.num_actions)
+
+dqagent = MYDQNAgent(
+        env=env,
+        model_path=os.path.join(
+            'experiments/new_limit_holdem_dqn_result/',
+            'my_dqn_model',
+        ),
+        epsilon_decay=0.999,
+        epsilon_start=1.0,
+        epsilon_end=0.05,
+        card_obs_shape=(6, 4, 13),
+        action_obs_shape=(24, 3, 4),
+        learning_rate=0.00005,
+        num_actions=env.num_actions,
+        batch_size=128,
+        tgt_update_freq=1000,
+        train_steps=1,
+        buffer_size=1000,
+        device=None
+    )
+
+agent1 = dqagent.load(
+    model_path=os.path.join('experiments/new_limit_holdem_dqn_result/', 'my_dqn_model'),
+)
+if agent1 is not None:
+    dqagent = agent1
+
 env.set_agents([
-    human_agent,
     human_agent2,
+    dqagent,
 ])
 
 print(">> Limit Hold'em random agent")

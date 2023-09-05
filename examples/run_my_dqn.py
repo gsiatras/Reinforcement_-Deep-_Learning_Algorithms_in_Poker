@@ -7,7 +7,8 @@ import argparse
 import rlcard
 from rlcard.agents import (
     MYDQNAgent,
-    RandomAgent
+    RandomAgent,
+    BluffAgent
 )
 from rlcard.utils import (
     set_seed,
@@ -41,32 +42,41 @@ def train(args):
         env=env,
         model_path=os.path.join(
             args.log_dir,
-            'ql_model',
+            'my_dqn_model_complex',
         ),
         epsilon_decay=0.9999,
         epsilon_start=1.0,
         epsilon_end=0.05,
         card_obs_shape=(6, 4, 13),
         action_obs_shape=(24, 3, 4),
-        learning_rate=0.00005,
+        learning_rate=0.0001,
         num_actions=env.num_actions,
         batch_size=256,
-        tgt_update_freq=2000,
+        tgt_update_freq=10000,
         train_steps=1,
+        buffer_size=10000,
         device=None
     )
-    #agent.load()  # If we have saved model, we first load the model
 
-    # Evaluate Ql
+    agent1 = agent.load(
+        model_path=os.path.join(args.log_dir, 'my_dqn_model_complex'),
+    )
+    if agent1 is not None:
+        agent = agent1
+
+    joker = BluffAgent(4, env)
+    joker_eval = BluffAgent(4, eval_env)
+    # Evaluate
     eval_env.set_agents([
         agent,
-        RandomAgent(num_actions=env.num_actions),
+        joker_eval
     ])
 
     env.set_agents([
         agent,
-        RandomAgent(num_actions=env.num_actions),
+        joker
     ])
+
 
     # Start training
     with Logger(args.log_dir) as logger:
@@ -88,6 +98,8 @@ def train(args):
                     loss,
                     epsilon
                 )
+                agent.save()
+                # print(agent.start_pos)
                 # print(agent.epsilon)
                 #print(agent.v)
 
@@ -100,14 +112,15 @@ def train(args):
     # Plot the learning curve
     plot_curve(csv_path, fig_path, 'DQN rewards')
     plot_curve2(csv2_path, fig2_path, 'DQN winrate', 'winrate')
-    plot_curve2(csv3_path, csv4_path, fig3_path, fig4_path, 'DQN avg_loss', 'avg_loss', 'epsilon')
+    plot_curve2(csv3_path, fig3_path, 'DQN avg_loss', 'avg_loss')
+    plot_curve2(csv4_path, fig4_path, 'DQN epsilon', 'epsilon')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("DQN Agent example in RLCard")
     parser.add_argument(
         '--seed',
         type=int,
-        default=22,
+        default=42,
     )
     parser.add_argument(
         '--num_episodes',
@@ -117,12 +130,12 @@ if __name__ == '__main__':
     parser.add_argument(
         '--num_eval_games',
         type=int,
-        default=2000,
+        default=3000,
     )
     parser.add_argument(
         '--evaluate_every',
         type=int,
-        default=4000,
+        default=10000,
     )
     parser.add_argument(
         '--log_dir',

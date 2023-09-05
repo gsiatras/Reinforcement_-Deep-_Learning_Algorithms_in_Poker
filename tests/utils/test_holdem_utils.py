@@ -29,7 +29,7 @@ class TestHoldemUtils(unittest.TestCase):
 
         hand = Hand(['CJ', 'CT', 'CQ', 'CK', 'C9', 'C8', 'S3'])
         hand.product = 20
-        self.assertEqual(hand._has_high_card(), False)
+        self.assertEqual(hand.has_high_card(), False)
 
     def test_compare_hands(self):
 
