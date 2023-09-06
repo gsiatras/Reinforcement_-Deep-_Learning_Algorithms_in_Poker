@@ -24,3 +24,4 @@ from rlcard.agents.ql_agent import QLAgent
 from rlcard.agents.pi_agent import PIAgent
 from rlcard.agents.my_dqn_agent import MYDQNAgent
 from rlcard.agents.bluff_agent import BluffAgent
+from rlcard.agents.my_dqn_agent_v2 import MYDQNV2Agent
