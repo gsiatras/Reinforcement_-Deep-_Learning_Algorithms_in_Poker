@@ -3,6 +3,7 @@ import random
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.init as init
 import torch.optim as optim
 import torch.nn.functional as F
 from collections import deque
@@ -36,17 +37,17 @@ class MYDQNAgent(object):
     def __init__(self,
                  env,
                  model_path='./Dqn_model',
-                 epsilon_decay=0.9999,
+                 epsilon_decay=0.999,
                  epsilon_start=1.0,
                  epsilon_end=0.01,
                  card_obs_shape=(6, 4, 13),
                  action_obs_shape=(24, 3, 4),
-                 learning_rate=0.005,
+                 learning_rate=0.0001,
                  num_actions=4,
-                 batch_size=64,
-                 tgt_update_freq=700,
+                 batch_size=264,
+                 tgt_update_freq=10000,
                  train_steps=1,
-                 buffer_size = 10000,
+                 buffer_size=10000,
                  device=None):
 
         self.num_actions = num_actions
@@ -65,7 +66,9 @@ class MYDQNAgent(object):
         self.use_raw = False
         self.buffer_size = buffer_size
         self.model = Model(card_obs_shape, action_obs_shape, num_actions, self.learning_rate)
+        self.model.initialize_weights()
         self.tgt = Model(card_obs_shape, action_obs_shape, num_actions, self.learning_rate)
+        self.tgt.initialize_weights()
 
         self.rb = ReplayBuffer(self.buffer_size)
         self.episodes = 0
@@ -403,7 +406,22 @@ class Model(nn.Module):
         )
 
         self.opt = optim.Adam(self.parameters(), lr=self.lr)
-        self.mse_loss = nn.MSELoss(reduction='mean')
+
+    def initialize_weights(self):
+        for layer in self.layer_path1:
+            if isinstance(layer, nn.Linear):
+                init.normal_(layer.weight, mean=0, std=0.01)
+                init.constant_(layer.bias, 0)
+
+        for layer in self.layer_path2:
+            if isinstance(layer, nn.Linear):
+                init.normal_(layer.weight, mean=0, std=0.01)
+                init.constant_(layer.bias, 0)
+
+        for layer in self.final_layer:
+            if isinstance(layer, nn.Linear):
+                init.normal_(layer.weight, mean=0, std=0.01)
+                init.constant_(layer.bias, 0)
 
     def forward(self, obs1, obs2):
         #print(obs1.shape)

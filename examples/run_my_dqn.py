@@ -46,7 +46,7 @@ def train(args):
             args.log_dir,
             'my_dqn_model_complex',
         ),
-        epsilon_decay=0.99992,
+        epsilon_decay=0.999,
         epsilon_start=1.0,
         epsilon_end=0.05,
         card_obs_shape=(6, 4, 13),
@@ -58,33 +58,10 @@ def train(args):
         train_steps=1,
         buffer_size=10000,
         device=None
+
     )
 
-    agent2 = MYDQNV2Agent(
-        env=env,
-        model_path=os.path.join(
-            args.log_dir,
-            'my_dqn_model2_complex',
-        ),
-        epsilon_decay=0.99993,
-        epsilon_start=1.0,
-        epsilon_end=0.05,
-        card_obs_shape=(6, 4, 13),
-        action_obs_shape=(24, 3, 4),
-        learning_rate=0.0003,
-        num_actions=env.num_actions,
-        batch_size=256,
-        tgt_update_freq=10000,
-        train_steps=1,
-        buffer_size=10000,
-        device=None
-    )
 
-    agent22 = agent2.load(
-        model_path=os.path.join(args.log_dir, 'my_dqn_model2_complex'),
-    )
-    if agent22 is not None:
-        agent2 = agent22
 
     agent1 = agent.load(
         model_path=os.path.join(args.log_dir, 'my_dqn_model_complex'),
@@ -153,7 +130,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--num_episodes',
         type=int,
-        default=250000,
+        default=100000,
     )
     parser.add_argument(
         '--num_eval_games',
