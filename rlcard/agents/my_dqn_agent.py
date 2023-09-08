@@ -3,7 +3,6 @@ import random
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.init as init
 import torch.optim as optim
 import torch.nn.functional as F
 from collections import deque
@@ -22,10 +21,17 @@ class Trans:
     next_state: Any
     done: bool
 
+
+# def cls(replay_memory_size, replay_memory_init_size, update_target_estimator_every, discount_factor, epsilon_start,
+#         epsilon_end, epsilon_decay_steps, batch_size, num_actions, state_shape, train_every, mlp_layers, learning_rate,
+#         device, save_path, save_every):
+#     pass
+
+
 class MYDQNAgent(object):
     '''
-    Approximate clone of rlcard.agents.my_dqn_agent.MYDQNAgent
-    pytorch implemantation specialized on limit holdem
+    Approximate clone of rlcard.agents.dqn_agent.DQNAgent
+    that depends on PyTorch instead of Tensorflow
     '''
     def __init__(self,
                  env,
@@ -35,14 +41,13 @@ class MYDQNAgent(object):
                  epsilon_end=0.01,
                  card_obs_shape=(6, 4, 13),
                  action_obs_shape=(24, 3, 4),
-                 learning_rate=0.00025,
+                 learning_rate=0.005,
                  num_actions=4,
-                 batch_size=128,
-                 tgt_update_freq=10000,
+                 batch_size=64,
+                 tgt_update_freq=700,
                  train_steps=1,
-                 buffer_size=100000,
-                 device=None,
-                 self_play=False):
+                 buffer_size = 10000,
+                 device=None):
 
         self.num_actions = num_actions
         self.env = env
@@ -59,39 +64,27 @@ class MYDQNAgent(object):
         self.agent_id = 0
         self.use_raw = False
         self.buffer_size = buffer_size
-        self.model = Model(card_obs_shape, action_obs_shape, num_actions, self.learning_rate)  # model
-        self.model.initialize_weights()
-        self.tgt = Model(card_obs_shape, action_obs_shape, num_actions, self.learning_rate)   # target model
-        self.tgt.initialize_weights()
+        self.model = Model(card_obs_shape, action_obs_shape, num_actions, self.learning_rate)
+        self.tgt = Model(card_obs_shape, action_obs_shape, num_actions, self.learning_rate)
+
         self.rb = ReplayBuffer(self.buffer_size)
         self.episodes = 0
         self.losses = []  # Store losses for monitoring
         self.start_pos = []
-        self.self_play = self_play
 
         if device is None:
             self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         else:
             self.device = device
-        if torch.cuda.is_available():
-            # Get the CUDA version
-            cuda_version = torch.version.cuda
-            print(f"CUDA Version: {cuda_version}")
-        else:
-            print("CUDA is not available on this system.")
 
 
     def train(self):
-        '''
-        Do 1 training iteration when buffer is full train the model and every x steps update the target model
+        ''' Do one iteration of QLA
         '''
         self.episodes += 1
         self.env.reset()
         self.find_agent()
-        if not self.self_play:
-            self.traverse_tree()
-        else:
-            self.train_self_play()
+        self.traverse_tree()
         self._decay_epsilon()
 
         if self.rb.size() > self.batch_size:
@@ -117,8 +110,6 @@ class MYDQNAgent(object):
         self.start_pos.append(self.agent_id)
 
     def get_avg_loss(self):
-        '''Return the avg loss and the current epsilon
-        '''
         if len(self.losses) > 0:
             avg_loss = sum(self.losses) / len(self.losses)  # Calculate the average loss
         else:
@@ -131,52 +122,15 @@ class MYDQNAgent(object):
         if self.epsilon > self.epsilon_min:
             self.epsilon = max(self.epsilon_min, self.epsilon * self.eps_decay)
 
-    def train_self_play(self):
-        # Check if the game is over to return the chips earned(reward of the game)
-        current_player = self.env.get_player_id()
-        if self.env.is_over():
-            card_obs, action_obs, legal_actions = self.get_state(current_player)
-            state = (card_obs, action_obs)
-            chips = self.env.get_payoffs()
-            return state, state, chips, True
-
-        # make move
-        card_obs, action_obs, legal_actions = self.get_state(current_player)
-        cur_state = (card_obs, action_obs)
-
-        obs1, obs2 = self.prepare_data(card_obs, action_obs)
-        with torch.no_grad():
-            qvals = self.model(obs1, obs2)
-            qvals = self.remove_illegal(qvals, legal_actions)
-
-        if np.random.rand() < self.epsilon:
-            # explore
-            action = np.random.choice(legal_actions)
-        else:
-            # action with highest Q value
-            action = np.argmax(qvals)
-
-        # print(action, legal_actions)
-
-        self.env.step2(action, legal_actions)
-        my_next_state, other_next_state, rewards, done = self.train_self_play()
-        self.env.step_back()
-        agent_rewards = rewards[current_player]
-        trans = Trans(cur_state, action, agent_rewards, my_next_state, done)
-        self.rb.insert(trans)
-
-        return other_next_state, cur_state, rewards, False
-
     def traverse_tree(self):
         ''' Traverse the game tree:
 
         Check if the game is over to return the chips earned(reward of the game)
         If opponents plays make the other agent play
-        If our agent plays get the Q value of the state from model
-        epsilon policy
-        Store transitions to buffer
+        If our agent plays check every possible action and get the Q value of the action
+        Then return the Qvalue of the best or a random state according to the epsilon (off policy)
+        Change the policy according to the new Q values
         '''
-
         current_player = self.env.get_player_id()
         # Check if the game is over to return the chips earned(reward of the game)
         if self.env.is_over():
@@ -206,7 +160,7 @@ class MYDQNAgent(object):
                 qvals = self.model(obs1, obs2)
                 #print(qvals)
                 #print(legal_actions)
-                qvals = self.remove_illegal(qvals[0], legal_actions)
+                qvals = self.remove_illegal(qvals, legal_actions)
                 #print(qvals)
 
             if np.random.rand() < self.epsilon:
@@ -226,7 +180,7 @@ class MYDQNAgent(object):
             trans = Trans(cur_state, action, reward, next_state, done)
             self.rb.insert(trans)
 
-        return cur_state, 0, False
+        return cur_state, reward, False
 
     def remove_illegal(self, qvals, legal_actions):
         """turn back to np array and remove illegal actions
@@ -242,16 +196,6 @@ class MYDQNAgent(object):
         return modified_qvals
 
     def prepare_data(self, obs1, obs2):
-        '''Prepare data to enter the net (flatten)
-        Args:
-            card_state (card_state_shape = (x,y,z))
-            action_state (action_state_shape = (x,y,z))
-
-        Returns:
-            card_state_flat (card_state_shape = (1,(1,x*y*z))
-            action_state_flat (action_state_shape = (1,(x*y*z))
-        '''
-
         # Convert to float if not already
         obs1_tensor = torch.from_numpy(obs1).float()
         obs2_tensor = torch.from_numpy(obs2).float()
@@ -285,26 +229,16 @@ class MYDQNAgent(object):
     """Pure NN"""
 
     def update_tgt_model(self, model, tgt):
-        '''
-        Update the weights of the target model
-        '''
         tgt.load_state_dict(model.state_dict())
 
+    def get_actions(self, card_obs, action_obs):
+        # obs shape is (N, card_tensor, state_tensor)
+        # q_vals = (N, 4)
+        q_vals = self.model(card_obs, action_obs)
+
+        return q_vals.max(-1)[1]
 
     def train_step(self, state_transitions, model, tgt, num_actions):
-        '''
-        Train the model
-        Args:
-            state_transitions: a batch of transitions
-            model: our model
-            tgt: our target model
-            num_actions: num of actions, output of the net
-        Returns:
-            loss: loss of the update
-
-            loss according to DQN paper
-        '''
-
         #print(state_transitions)
         # Unpack the state transitions
         cur_state_card_trans = [s.state[0] for s in state_transitions]
@@ -337,13 +271,6 @@ class MYDQNAgent(object):
         return mean_loss
 
     def eval_step(self, state):
-        '''
-        Evaluating step
-        Args:
-            state: current state
-        Returns:
-            action (int)
-        '''
         card_obs = state['card_tensor']
         action_obs = state['action_tensor']
         legal_actions = list(state['legal_actions'].keys())
@@ -351,7 +278,7 @@ class MYDQNAgent(object):
         obs1, obs2 = self.prepare_data(card_obs, action_obs)
         with torch.no_grad():
             qvals = self.tgt(obs1, obs2)
-            qvals = self.remove_illegal(qvals[0], legal_actions)
+            qvals = self.remove_illegal(qvals, legal_actions)
 
         action = np.argmax(qvals)
 
@@ -406,11 +333,6 @@ class MYDQNAgent(object):
 
     @classmethod
     def load(cls, model_path, filename='checkpoint_my_dqn.pt'):
-        ''' Load a model
-        Returns: instance if found
-                    else
-                none
-        '''
         try:
             file = open(os.path.join(model_path, filename), 'rb')
             agent_params = pickle.load(file)
@@ -448,10 +370,7 @@ class MYDQNAgent(object):
 
 
 class Model(nn.Module):
-    """Our network
-    2 layer paths (action space and card space 2 layers each 512neurons)
-    1 final layer merging the 2 others (2 layers 512 neurons)
-    """
+    """Our network"""
     def __init__(self, card_obs_shape, action_obs_shape, num_actions, learning_rate=0.0005):
         super(Model, self).__init__()
         self.lr = learning_rate
@@ -466,7 +385,7 @@ class Model(nn.Module):
             nn.Linear(input_dim1, 512),
             nn.ReLU(),
             nn.Linear(512, 512),
-            nn.ReLU()
+            nn.ReLU(),
         )
 
         self.layer_path2 = torch.nn.Sequential(
@@ -474,7 +393,7 @@ class Model(nn.Module):
             nn.Linear(input_dim2, 512),
             nn.ReLU(),
             nn.Linear(512, 512),
-            nn.ReLU()
+            nn.ReLU(),
         )
 
         self.final_layer = nn.Sequential(
@@ -484,31 +403,9 @@ class Model(nn.Module):
         )
 
         self.opt = optim.Adam(self.parameters(), lr=self.lr)
-
-    def initialize_weights(self):
-        '''
-        Initialize net weights
-        random small value for W
-        0 for bias
-        '''
-        for layer in self.layer_path1:
-            if isinstance(layer, nn.Linear):
-                init.normal_(layer.weight, mean=0, std=0.01)
-                init.constant_(layer.bias, 0)
-
-        for layer in self.layer_path2:
-            if isinstance(layer, nn.Linear):
-                init.normal_(layer.weight, mean=0, std=0.01)
-                init.constant_(layer.bias, 0)
-
-        for layer in self.final_layer:
-            if isinstance(layer, nn.Linear):
-                init.normal_(layer.weight, mean=0, std=0.01)
-                init.constant_(layer.bias, 0)
+        self.mse_loss = nn.MSELoss(reduction='mean')
 
     def forward(self, obs1, obs2):
-        '''Forward propagation
-        '''
         #print(obs1.shape)
 
         # Process each observation through its respective pathway
@@ -520,7 +417,7 @@ class Model(nn.Module):
 
         # Pass the combined features through the final layer
         actions = self.final_layer(combined_features)
-        return actions
+        return actions[0]
 
 
 class ReplayBuffer:
@@ -539,3 +436,29 @@ class ReplayBuffer:
 
     def size(self):
         return len(self.buffer)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
