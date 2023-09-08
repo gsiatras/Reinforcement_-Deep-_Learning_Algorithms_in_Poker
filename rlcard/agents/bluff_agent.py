@@ -89,28 +89,40 @@ class BluffAgent(object):
                         return action
 
             if hand.has_flush():
-                if random.random() < self.bluff_threshold:
+                if self.env.game.round_counter == 1:
                     action = self.aggressive_actions(legal_actions)
                     return action
                 else:
-                    action = self.normal_actions(legal_actions)
-                    return action
+                    if random.random() < self.bluff_threshold:
+                        action = self.aggressive_actions(legal_actions)
+                        return action
+                    else:
+                        action = self.normal_actions(legal_actions)
+                        return action
 
             if hand.has_straight(hand.all_cards):
-                if random.random() < self.bluff_threshold:
+                if self.env.game.round_counter == 1:
                     action = self.aggressive_actions(legal_actions)
                     return action
                 else:
-                    action = self.normal_actions(legal_actions)
-                    return action
+                    if random.random() < self.bluff_threshold:
+                        action = self.aggressive_actions(legal_actions)
+                        return action
+                    else:
+                        action = self.normal_actions(legal_actions)
+                        return action
 
             if hand.has_three():
-                if random.random() < self.bluff_threshold:
+                if self.env.game.round_counter == 1:
                     action = self.aggressive_actions(legal_actions)
                     return action
                 else:
-                    action = self.normal_actions(legal_actions)
-                    return action
+                    if random.random() < self.bluff_threshold:
+                        action = self.aggressive_actions(legal_actions)
+                        return action
+                    else:
+                        action = self.normal_actions(legal_actions)
+                        return action
 
             if hand.has_two_pairs():
                 if random.random() < self.bluff_threshold:

@@ -7,11 +7,9 @@ import argparse
 import rlcard
 from rlcard.agents import (
     MYDQNAgent,
-    MYDQNV2Agent,
     RandomAgent,
     BluffAgent
 )
-
 from rlcard.utils import (
     set_seed,
     tournament,
@@ -44,50 +42,25 @@ def train(args):
         env=env,
         model_path=os.path.join(
             args.log_dir,
-            'my_dqn_model_complex',
+            'my_dqn_model',
         ),
-        epsilon_decay=0.99992,
+        epsilon_decay=0.9999,
         epsilon_start=1.0,
         epsilon_end=0.05,
         card_obs_shape=(6, 4, 13),
         action_obs_shape=(24, 3, 4),
-        learning_rate=0.0001,
+        learning_rate=0.00025,
         num_actions=env.num_actions,
-        batch_size=256,
+        batch_size=128,
         tgt_update_freq=10000,
         train_steps=1,
-        buffer_size=10000,
-        device=None
+        buffer_size=100000,
+        device=None,
+        self_play=False
     )
-
-    agent2 = MYDQNV2Agent(
-        env=env,
-        model_path=os.path.join(
-            args.log_dir,
-            'my_dqn_model2_complex',
-        ),
-        epsilon_decay=0.99993,
-        epsilon_start=1.0,
-        epsilon_end=0.05,
-        card_obs_shape=(6, 4, 13),
-        action_obs_shape=(24, 3, 4),
-        learning_rate=0.0003,
-        num_actions=env.num_actions,
-        batch_size=256,
-        tgt_update_freq=10000,
-        train_steps=1,
-        buffer_size=10000,
-        device=None
-    )
-
-    agent22 = agent2.load(
-        model_path=os.path.join(args.log_dir, 'my_dqn_model2_complex'),
-    )
-    if agent22 is not None:
-        agent2 = agent22
 
     agent1 = agent.load(
-        model_path=os.path.join(args.log_dir, 'my_dqn_model_complex'),
+        model_path=os.path.join(args.log_dir, 'my_dqn_model'),
     )
     if agent1 is not None:
         agent = agent1
@@ -102,7 +75,7 @@ def train(args):
 
     env.set_agents([
         agent,
-        joker
+        joker,
     ])
 
 
@@ -111,6 +84,10 @@ def train(args):
         for episode in range(args.num_episodes):
             print('\rIteration {}'.format(episode), end='')
             # Evaluate the performance. Play with Random agents.
+            # if episode % 3 == 0:
+            #     agent.self_play = True
+            # else:
+            #     agent.self_play = False
             agent.train()
 
             if episode % args.evaluate_every == 0:
@@ -153,7 +130,7 @@ if __name__ == '__main__':
     parser.add_argument(
         '--num_episodes',
         type=int,
-        default=250000,
+        default=200001,
     )
     parser.add_argument(
         '--num_eval_games',
