@@ -180,7 +180,7 @@ class MYDQNAgent(object):
             trans = Trans(cur_state, action, reward, next_state, done)
             self.rb.insert(trans)
 
-        return cur_state, reward, False
+        return cur_state, 0, False
 
     def remove_illegal(self, qvals, legal_actions):
         """turn back to np array and remove illegal actions
@@ -417,7 +417,7 @@ class Model(nn.Module):
 
         # Pass the combined features through the final layer
         actions = self.final_layer(combined_features)
-        return actions[0]
+        return actions
 
 
 class ReplayBuffer:

@@ -226,7 +226,7 @@ class MYDQNAgent(object):
             trans = Trans(cur_state, action, reward, next_state, done)
             self.rb.insert(trans)
 
-        return cur_state, reward, False
+        return cur_state, 0, False
 
     def remove_illegal(self, qvals, legal_actions):
         """turn back to np array and remove illegal actions
