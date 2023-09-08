@@ -147,7 +147,7 @@ class MYDQNAgent(object):
         obs1, obs2 = self.prepare_data(card_obs, action_obs)
         with torch.no_grad():
             qvals = self.model(obs1, obs2)
-            qvals = self.remove_illegal(qvals, legal_actions)
+            qvals = self.remove_illegal(qvals[0], legal_actions)
 
         if np.random.rand() < self.epsilon:
             # explore
@@ -206,7 +206,7 @@ class MYDQNAgent(object):
                 qvals = self.model(obs1, obs2)
                 #print(qvals)
                 #print(legal_actions)
-                qvals = self.remove_illegal(qvals, legal_actions)
+                qvals = self.remove_illegal(qvals[0], legal_actions)
                 #print(qvals)
 
             if np.random.rand() < self.epsilon:
@@ -351,7 +351,7 @@ class MYDQNAgent(object):
         obs1, obs2 = self.prepare_data(card_obs, action_obs)
         with torch.no_grad():
             qvals = self.tgt(obs1, obs2)
-            qvals = self.remove_illegal(qvals, legal_actions)
+            qvals = self.remove_illegal(qvals[0], legal_actions)
 
         action = np.argmax(qvals)
 
