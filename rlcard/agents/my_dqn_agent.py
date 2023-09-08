@@ -46,7 +46,7 @@ class MYDQNAgent(object):
                  batch_size=64,
                  tgt_update_freq=700,
                  train_steps=1,
-                 buffer_size = 10000,
+                 buffer_size=10000,
                  device=None):
 
         self.num_actions = num_actions

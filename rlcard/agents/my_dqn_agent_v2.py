@@ -482,7 +482,7 @@ class Model(nn.Module):
             nn.ReLU(),
             nn.Linear(512, 1),
         )
-
+#
         self.advantage_layer = nn.Sequential(
             nn.Linear(2 * 512, 512),
             nn.ReLU(),
