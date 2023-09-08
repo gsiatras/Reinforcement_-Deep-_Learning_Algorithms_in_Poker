@@ -46,17 +46,17 @@ def train(args):
             args.log_dir,
             'my_dqn_model_complex',
         ),
-        epsilon_decay=0.99992,
+        epsilon_decay=0.9999,
         epsilon_start=1.0,
         epsilon_end=0.05,
         card_obs_shape=(6, 4, 13),
         action_obs_shape=(24, 3, 4),
-        learning_rate=0.0001,
+        learning_rate=0.00025,
         num_actions=env.num_actions,
-        batch_size=256,
+        batch_size=128,
         tgt_update_freq=10000,
         train_steps=1,
-        buffer_size=10000,
+        buffer_size=100000,
         device=None
     )
 

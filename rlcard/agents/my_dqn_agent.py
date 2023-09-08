@@ -41,12 +41,12 @@ class MYDQNAgent(object):
                  epsilon_end=0.01,
                  card_obs_shape=(6, 4, 13),
                  action_obs_shape=(24, 3, 4),
-                 learning_rate=0.005,
+                 learning_rate=0.00025,
                  num_actions=4,
-                 batch_size=64,
-                 tgt_update_freq=700,
+                 batch_size=128,
+                 tgt_update_freq=10000,
                  train_steps=1,
-                 buffer_size=10000,
+                 buffer_size=100000,
                  device=None):
 
         self.num_actions = num_actions
