@@ -4,10 +4,8 @@ import random
 
 
 class BluffAgent(object):
-    ''' A threshold agent. He will be playing limit-holdem.
-        Will bet the maximum amount allowed in each round, provided that it has at least a high enough "combination".
-        In round 1 it will always bet/raise with a K or Ace.
-        In round 2 it will always bet/raise with any pair and three.
+    ''' A threshold agent used to evaluate and train agents. He will be playing limit-holdem.
+        He bluffs to make he's behavior harder to decode for agents
     '''
 
     def __init__(self, num_actions, env):

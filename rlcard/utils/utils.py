@@ -339,3 +339,43 @@ def plot_curve2(csv_path, save_path, algorithm, name):
 
         fig.savefig(save_path)
 
+
+def plot_curve_multi(csv_path1, csv_path2, save_path, algorithm1, algorithm2, name):
+    ''' Read data from two CSV files and plot the results on the same plot.
+    '''
+    import os
+    import csv
+    import matplotlib.pyplot as plt
+
+    # Read data from the first CSV file
+    with open(csv_path1) as csvfile1:
+        reader1 = csv.DictReader(csvfile1)
+        xs1 = []
+        ys1 = []
+        for row in reader1:
+            xs1.append(int(row['episode']))
+            ys1.append(float(row[name]))
+
+    # Read data from the second CSV file
+    with open(csv_path2) as csvfile2:
+        reader2 = csv.DictReader(csvfile2)
+        xs2 = []
+        ys2 = []
+        for row in reader2:
+            xs2.append(int(row['episode']))
+            ys2.append(float(row[name]))
+
+    # Create the plot
+    fig, ax = plt.subplots()
+    ax.plot(xs1, ys1, label=algorithm1)
+    ax.plot(xs2, ys2, label=algorithm2)  # Plot the data from the second CSV file
+    ax.set(xlabel='episode', ylabel=name)  # Use name1 for the ylabel, but you can change this if needed
+    ax.legend()
+    ax.grid()
+
+    save_dir = os.path.dirname(save_path)
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+
+    fig.savefig(save_path)
+

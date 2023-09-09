@@ -22,10 +22,9 @@ class Trans:
     next_state: Any
     done: bool
 
-class MYDQNAgent(object):
+class MYDQNAgentV2(object):
     '''
-    Approximate clone of rlcard.agents.my_dqn_agent.MYDQNAgent
-    pytorch implemantation specialized on limit holdem
+    DUELING DOUBLE DQN AGENT for limit texas holdem
     '''
     def __init__(self,
                  env,
@@ -111,7 +110,7 @@ class MYDQNAgent(object):
         '''
         agents = self.env.get_agents()
         for id, agent in enumerate(agents):
-            if isinstance(agent, MYDQNAgent):
+            if isinstance(agent, MYDQNAgentV2):
                 self.agent_id = id
                 break
         self.start_pos.append(self.agent_id)
@@ -162,6 +161,7 @@ class MYDQNAgent(object):
         my_next_state, other_next_state, rewards, done = self.train_self_play()
         self.env.step_back()
         agent_rewards = rewards[current_player]
+        rewards[current_player] = 0
         trans = Trans(cur_state, action, agent_rewards, my_next_state, done)
         self.rb.insert(trans)
 
@@ -204,6 +204,7 @@ class MYDQNAgent(object):
             obs1, obs2 = self.prepare_data(card_obs, action_obs)
             with torch.no_grad():
                 qvals = self.model(obs1, obs2)
+                #print(qvals)
                 #print(qvals)
                 #print(legal_actions)
                 qvals = self.remove_illegal(qvals[0], legal_actions)
@@ -507,7 +508,12 @@ class Model(nn.Module):
                 init.normal_(layer.weight, mean=0, std=0.01)
                 init.constant_(layer.bias, 0)
 
-        for layer in self.final_layer:
+        for layer in self.value_layer:
+            if isinstance(layer, nn.Linear):
+                init.normal_(layer.weight, mean=0, std=0.01)
+                init.constant_(layer.bias, 0)
+
+        for layer in self.advantage_layer:
             if isinstance(layer, nn.Linear):
                 init.normal_(layer.weight, mean=0, std=0.01)
                 init.constant_(layer.bias, 0)
@@ -527,8 +533,8 @@ class Model(nn.Module):
         # Pass the combined features through the final layer
         Values = self.value_layer(combined_features)
         Advantages = self.advantage_layer(combined_features)
-
-        Qvals = Values + (Advantages - (1/torch.abs(Advantages) * Advantages.max(dim=1, keepdim=True)))
+        A_max = Advantages.max(dim=1, keepdim=True).values
+        Qvals = Values + (Advantages - (1/torch.abs(Advantages) * A_max))
 
         return Qvals
 

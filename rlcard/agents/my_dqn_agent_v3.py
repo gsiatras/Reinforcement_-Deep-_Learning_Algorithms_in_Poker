@@ -1,8 +1,7 @@
 import os
-import random
-import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.init as init
 import torch.optim as optim
 import torch.nn.functional as F
 from collections import deque
@@ -11,7 +10,9 @@ from typing import Any
 from random import sample
 from rlcard.utils.utils import *
 import pickle
-import torch.nn.init as init
+import random
+import numpy as np
+from rlcard.utils import SumTree
 
 
 @dataclass
@@ -22,9 +23,9 @@ class Trans:
     next_state: Any
     done: bool
 
-class MYDQNAgent(object):
+class MYDQNAgentV3(object):
     '''
-    DOUBLE DQN AGENT for limit texas holdem
+    DUELING DOUBLE DQN AGENT for limit texas holdem
     '''
     def __init__(self,
                  env,
@@ -40,8 +41,7 @@ class MYDQNAgent(object):
                  tgt_update_freq=10000,
                  train_steps=1,
                  buffer_size=100000,
-                 device=None,
-                 self_play=False):
+                 device=None,):
 
         self.num_actions = num_actions
         self.env = env
@@ -58,18 +58,15 @@ class MYDQNAgent(object):
         self.agent_id = 0
         self.use_raw = False
         self.buffer_size = buffer_size
-
         self.model = Model(card_obs_shape, action_obs_shape, num_actions, self.learning_rate)  # model
         self.model.initialize_weights()
-
-        self.tgt = Model(card_obs_shape, action_obs_shape, num_actions, self.learning_rate)  # target model
+        self.tgt = Model(card_obs_shape, action_obs_shape, num_actions, self.learning_rate)   # target model
         self.tgt.initialize_weights()
-
-        self.rb = ReplayBuffer(self.buffer_size)
+        self.rb = Memory(self.buffer_size)
         self.episodes = 0
         self.losses = []  # Store losses for monitoring
         self.start_pos = []
-        self.self_play = self_play
+
 
         if device is None:
             self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -84,22 +81,24 @@ class MYDQNAgent(object):
 
 
     def train(self):
-        ''' Do one iteration of QLA
+        '''
+        Do 1 training iteration when buffer is full train the model and every x steps update the target model
         '''
         self.episodes += 1
         self.env.reset()
         self.find_agent()
-        if not self.self_play:
-            self.traverse_tree()
-        else:
-            self.train_self_play()
+
+        self.traverse_tree()
         self._decay_epsilon()
 
         if self.rb.size() > self.batch_size:
 
             for _ in range(self.num_train_steps):
-                loss = self.train_step(self.rb.sample(self.batch_size), self.model, self.tgt, self.num_actions)
+                tree_idx, batch, ISWeights_mb = self.rb.sample(self.buffer_size)
+                loss, absolute_errors = self.train_step(batch, self.model, self.tgt, self.num_actions, ISWeights_mb)
                 self.losses.append(loss.item())  # Convert the loss to a scalar and store it
+                self.rb.batch_update(tree_idx, absolute_errors)
+
 
             if self.episodes % self.tgt_update_freq == 0:
                 self.update_tgt_model(self.model, self.tgt)
@@ -112,12 +111,14 @@ class MYDQNAgent(object):
         '''
         agents = self.env.get_agents()
         for id, agent in enumerate(agents):
-            if isinstance(agent, MYDQNAgent):
+            if isinstance(agent, MYDQNAgentV3):
                 self.agent_id = id
                 break
         self.start_pos.append(self.agent_id)
 
     def get_avg_loss(self):
+        '''Return the avg loss and the current epsilon
+        '''
         if len(self.losses) > 0:
             avg_loss = sum(self.losses) / len(self.losses)  # Calculate the average loss
         else:
@@ -130,44 +131,6 @@ class MYDQNAgent(object):
         if self.epsilon > self.epsilon_min:
             self.epsilon = max(self.epsilon_min, self.epsilon * self.eps_decay)
 
-    def train_self_play(self):
-        '''Self play training loop
-        '''
-        # Check if the game is over to return the chips earned(reward of the game)
-        current_player = self.env.get_player_id()
-        if self.env.is_over():
-            card_obs, action_obs, legal_actions = self.get_state(current_player)
-            state = (card_obs, action_obs)
-            chips = self.env.get_payoffs()
-            return state, state, chips, True
-
-        # make move
-        card_obs, action_obs, legal_actions = self.get_state(current_player)
-        cur_state = (card_obs, action_obs)
-
-        obs1, obs2 = self.prepare_data(card_obs, action_obs)
-        with torch.no_grad():
-            qvals = self.model(obs1, obs2)
-            qvals = self.remove_illegal(qvals[0], legal_actions)
-
-        if np.random.rand() < self.epsilon:
-            # explore
-            action = np.random.choice(legal_actions)
-        else:
-            # action with highest Q value
-            action = np.argmax(qvals)
-
-        # print(action, legal_actions)
-
-        self.env.step2(action, legal_actions)
-        my_next_state, other_next_state, rewards, done = self.train_self_play()
-        self.env.step_back()
-        agent_rewards = rewards[current_player]
-        rewards[current_player] = 0
-        trans = Trans(cur_state, action, agent_rewards, my_next_state, done)
-        self.rb.insert(trans)
-
-        return other_next_state, cur_state, rewards, False
 
     def traverse_tree(self):
         ''' Traverse the game tree:
@@ -178,6 +141,7 @@ class MYDQNAgent(object):
         epsilon policy
         Store transitions to buffer
         '''
+
         current_player = self.env.get_player_id()
         # Check if the game is over to return the chips earned(reward of the game)
         if self.env.is_over():
@@ -206,6 +170,7 @@ class MYDQNAgent(object):
             with torch.no_grad():
                 qvals = self.model(obs1, obs2)
                 #print(qvals)
+                #print(qvals)
                 #print(legal_actions)
                 qvals = self.remove_illegal(qvals[0], legal_actions)
                 #print(qvals)
@@ -225,7 +190,7 @@ class MYDQNAgent(object):
             self.env.step_back()
 
             trans = Trans(cur_state, action, reward, next_state, done)
-            self.rb.insert(trans)
+            self.rb.store(trans)
 
         return cur_state, 0, False
 
@@ -244,13 +209,15 @@ class MYDQNAgent(object):
 
     def prepare_data(self, obs1, obs2):
         '''Prepare data to enter the net (flatten)
-               Args:
-                   card_state (card_state_shape = (x,y,z))
-                   action_state (action_state_shape = (x,y,z))
-               Returns:
-                   card_state_flat (card_state_shape = (1,(1,x*y*z))
-                   action_state_flat (action_state_shape = (1,(x*y*z))
+        Args:
+            card_state (card_state_shape = (x,y,z))
+            action_state (action_state_shape = (x,y,z))
+
+        Returns:
+            card_state_flat (card_state_shape = (1,(1,x*y*z))
+            action_state_flat (action_state_shape = (1,(x*y*z))
         '''
+
         # Convert to float if not already
         obs1_tensor = torch.from_numpy(obs1).float()
         obs2_tensor = torch.from_numpy(obs2).float()
@@ -290,7 +257,7 @@ class MYDQNAgent(object):
         tgt.load_state_dict(model.state_dict())
 
 
-    def train_step(self, state_transitions, model, tgt, num_actions):
+    def train_step(self, state_transitions, model, tgt, num_actions, is_weights):
         '''
         Train the model
         Args:
@@ -300,6 +267,7 @@ class MYDQNAgent(object):
             num_actions: num of actions, output of the net
         Returns:
             loss: loss of the update
+
             loss according to DQN paper
         '''
 
@@ -322,17 +290,23 @@ class MYDQNAgent(object):
         actions = [s.action for s in state_transitions]
 
         with torch.no_grad():
-            qvals_next = tgt(next_states1, next_states2).max(-1)[0]  # (N, num_actions)
+            qvals_next = tgt(next_states1, next_states2)
+            qvals_next_best = qvals_next.max(-1)[0]  # (N, num_actions)
 
         model.opt.zero_grad()
         qvals = model(cur_states1, cur_states2)  # (N, num_actions)
         one_hot_actions = F.one_hot(torch.LongTensor(actions), num_actions)
-        loss = (rewards + mask[:, 0]*qvals_next - torch.sum(qvals * one_hot_actions, dim=-1)) ** 2
+        loss = (rewards + mask[:, 0]*qvals_next_best - torch.sum(qvals * one_hot_actions, dim=-1)) ** 2
+        # update loss depending on experience weights
+        loss = loss * torch.FloatTensor(is_weights)
         mean_loss = loss.mean()
-        #loss = model.mse_loss(qvals, qvals_next)
+        abs_errors = torch.abs(qvals_next - qvals)
+
+        mean_abs_errors = torch.mean(abs_errors, dim=1)
+
         mean_loss.backward()
         model.opt.step()
-        return mean_loss
+        return mean_loss, mean_abs_errors
 
     def eval_step(self, state):
         '''
@@ -464,7 +438,7 @@ class Model(nn.Module):
             nn.Linear(input_dim1, 512),
             nn.ReLU(),
             nn.Linear(512, 512),
-            nn.ReLU(),
+            nn.ReLU()
         )
 
         self.layer_path2 = torch.nn.Sequential(
@@ -472,33 +446,23 @@ class Model(nn.Module):
             nn.Linear(input_dim2, 512),
             nn.ReLU(),
             nn.Linear(512, 512),
-            nn.ReLU(),
+            nn.ReLU()
         )
 
-        self.final_layer = nn.Sequential(
+        self.value_layer = nn.Sequential(
+            nn.Linear(2 * 512, 512),
+            nn.ReLU(),
+            nn.Linear(512, 1),
+        )
+#
+        self.advantage_layer = nn.Sequential(
             nn.Linear(2 * 512, 512),
             nn.ReLU(),
             nn.Linear(512, num_actions),
         )
 
         self.opt = optim.Adam(self.parameters(), lr=self.lr)
-        self.mse_loss = nn.MSELoss(reduction='mean')
 
-    def forward(self, obs1, obs2):
-        '''Forward propagation
-        '''
-        #print(obs1.shape)
-
-        # Process each observation through its respective pathway
-        obs1_out = self.layer_path1(obs1)
-        obs2_out = self.layer_path2(obs2)
-
-        # Concatenate the outputs from both pathways
-        combined_features = torch.cat((obs1_out, obs2_out), dim=1)
-
-        # Pass the combined features through the final layer
-        actions = self.final_layer(combined_features)
-        return actions
     def initialize_weights(self):
         '''
         Initialize net weights
@@ -515,52 +479,143 @@ class Model(nn.Module):
                 init.normal_(layer.weight, mean=0, std=0.01)
                 init.constant_(layer.bias, 0)
 
-        for layer in self.final_layer:
+        for layer in self.value_layer:
             if isinstance(layer, nn.Linear):
                 init.normal_(layer.weight, mean=0, std=0.01)
                 init.constant_(layer.bias, 0)
 
+        for layer in self.advantage_layer:
+            if isinstance(layer, nn.Linear):
+                init.normal_(layer.weight, mean=0, std=0.01)
+                init.constant_(layer.bias, 0)
+
+    def forward(self, obs1, obs2):
+        '''Forward propagation
+        '''
+        #print(obs1.shape)
+
+        # Process each observation through its respective pathway
+        obs1_out = self.layer_path1(obs1)
+        obs2_out = self.layer_path2(obs2)
+
+        # Concatenate the outputs from both pathways
+        combined_features = torch.cat((obs1_out, obs2_out), dim=1)
+
+        # Pass the combined features through the final layer
+        Values = self.value_layer(combined_features)
+        Advantages = self.advantage_layer(combined_features)
+        A_max = Advantages.max(dim=1, keepdim=True).values
+        Qvals = Values + (Advantages - (1/torch.abs(Advantages) * A_max))
+
+        return Qvals
 
 
-class ReplayBuffer:
-    """ Our replay buffer
+class Memory(object):
     """
-    def __init__(self, buffer_size=10000):
-        self.buffer_size = buffer_size
-        self.buffer = deque(maxlen=buffer_size)
+    This SumTree code is modified version and the original code is from:
+    https://github.com/jaara/AI-blog/blob/master/Seaquest-DDQN-PER.py
+    """
+    PER_e = 0.01  # Hyperparameter that we use to avoid some experiences to have 0 probability of being taken
+    PER_a = 0.6  # Hyperparameter that we use to make a tradeoff between taking only exp with high priority and sampling randomly
+    PER_b = 0.4  # importance-sampling, from initial value increasing to 1
 
-    def insert(self, trans):
-        self.buffer.append(trans)
+    PER_b_increment_per_sampling = 0.001
 
-    def sample(self, num_samples):
-        assert num_samples <= len(self.buffer)
-        return sample(self.buffer, num_samples)
+    absolute_error_upper = 1.  # clipped abs error
+
+    def __init__(self, capacity):
+        # Making the tree
+        """
+        Remember that our tree is composed of a sum tree that contains the priority scores at his leaf
+        And also a data array
+        We don't use deque because it means that at each timestep our experiences change index by one.
+        We prefer to use a simple array and to overwrite when the memory is full.
+        """
+        self.tree = SumTree(capacity)
+
+
+    """
+    Store a new experience in our tree
+    Each new experience have a score of max_prority (it will be then improved when we use this exp to train our DDQN)
+    """
+
+    def store(self, experience):
+        # Find the max priority
+        max_priority = np.max(self.tree.tree[-self.tree.capacity:])
+
+        # If the max priority = 0 we can't put priority = 0 since this exp will never have a chance to be selected
+        # So we use a minimum priority
+        if max_priority == 0:
+            max_priority = self.absolute_error_upper
+            print('1')
+        self.tree.add(max_priority, experience)  # set the max p for new p
+
+    """
+    - First, to sample a minibatch of k size, the range [0, priority_total] is / into k ranges.
+    - Then a value is uniformly sampled from each range
+    - We search in the sumtree, the experience where priority score correspond to sample values are retrieved from.
+    - Then, we calculate IS weights for each minibatch element
+    """
 
     def size(self):
-        return len(self.buffer)
+        """Return the current size of the replay buffer."""
+        return self.tree.n_entries
 
+    def sample(self, n):
+        # Create a sample array that will contains the minibatch
+        memory_b = []
 
+        b_idx, b_ISWeights = np.empty((n,), dtype=np.int32), np.empty((n, 1), dtype=np.float32)
 
+        # Calculate the priority segment
+        # Here, as explained in the paper, we divide the Range[0, ptotal] into n ranges
+        priority_segment = self.tree.total_priority / n  # priority segment
 
+        # Here we increasing the PER_b each time we sample a new minibatch
+        self.PER_b = np.min([1., self.PER_b + self.PER_b_increment_per_sampling])  # max = 1
 
+        non_zero_priorities = self.tree.tree[-self.tree.capacity:]
+        non_zero_priorities = non_zero_priorities[non_zero_priorities > 0]  # Filter out zero priorities
+        if len(non_zero_priorities) > 0:
+            p_min = np.min(non_zero_priorities) / self.tree.total_priority
+        else:
+            p_min = 0.0
+        # print('pmin', p_min)
+        max_weight = (p_min * n) ** (-self.PER_b)
+        # print('max w', max_weight)
 
+        for i in range(n):
+            """
+            A value is uniformly sample from each range
+            """
+            a, b = priority_segment * i, priority_segment * (i + 1)
+            value = np.random.uniform(a, b)
 
+            """
+            Experience that correspond to each value is retrieved
+            """
+            index, priority, data = self.tree.get_leaf(value)
 
+            # P(j)
+            sampling_probabilities = priority / self.tree.total_priority
 
+            #  IS = (1/N * 1/P(i))**b /max wi == (N*P(i))**-b  /max wi
+            b_ISWeights[i, 0] = np.power(n * sampling_probabilities, -self.PER_b) / max_weight
 
+            b_idx[i] = index
 
+            memory_b.append(data)
 
+        return b_idx, memory_b, b_ISWeights
 
+    """
+    Update the priorities on the tree
+    """
 
+    def batch_update(self, tree_idx, abs_errors):
+        abs_errors += self.PER_e  # convert to abs and avoid 0
+        clipped_errors = np.minimum(abs_errors.detach().numpy(), self.absolute_error_upper)
+        ps = np.power(clipped_errors, self.PER_a)
 
-
-
-
-
-
-
-
-
-
-
-
+        for ti, p in zip(tree_idx, ps):
+            self.tree.update(ti, p)
