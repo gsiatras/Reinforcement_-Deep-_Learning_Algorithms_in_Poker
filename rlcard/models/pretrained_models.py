@@ -29,7 +29,7 @@ class LeducHoldemCFRModel(Model):
               functioning well.
         '''
         return [self.agent, self.agent]
-
+#
 class LimitHoldemDQNModel(Model):
     ''' A pretrained model on Leduc Holdem with CFR (chance sampling)
     '''
