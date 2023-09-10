@@ -445,7 +445,8 @@ class MYDQNAgentV2(object):
 
             return agent_instance
         except FileNotFoundError:
-            print(f"\nINFO - No checkpoint file '{filename}' found. Creating a new agent.")
+            print(f"\nINFO - No checkpoint file '{os.path.join(model_path, filename)}' found. Creating a new agent.")
+
             return None
 
 
