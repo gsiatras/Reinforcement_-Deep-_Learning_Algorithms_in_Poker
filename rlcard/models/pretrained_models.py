@@ -38,7 +38,7 @@ class LimitHoldemDQNModel(Model):
         '''
         env = rlcard.make('limit-holdem')
         self.agent = MYDQNAgentV2(env, model_path=os.path.join(ROOT_PATH, 'limit_holdem_pretrained'))
-        self.agent.load(model_path=os.path.join(ROOT_PATH, 'limit_holdem_pretrained'))
+        self.agent.load(model_path='/content/Reinforcement_Deep_Learning_Algorithms_in_Poker/rlcard/models/pretrained/limit_holdem_pretrained')
     @property
     def agents(self):
         ''' Get a list of agents for each position in a the game
