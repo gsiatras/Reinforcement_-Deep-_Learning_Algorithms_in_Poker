@@ -369,7 +369,7 @@ class MYDQNAgentV2(object):
         return self.eval_step(state)
 
 
-    def save(self, filename='checkpoint_my_dqn.pt'):
+    def save(self, filename='checkpoint_my_dqn_dueling.pt'):
         """
         Save relevant parameters of the MYDQNAgent instance to a file.
         """
@@ -406,12 +406,13 @@ class MYDQNAgentV2(object):
         checkpoint_file.close()
 
     @classmethod
-    def load(cls, model_path, filename='checkpoint_my_dqn.pt'):
+    def load(cls, model_path, filename='checkpoint_my_dqn_dueling.pt'):
         ''' Load a model
         Returns: instance if found
                     else
                 none
         '''
+
         try:
             file = open(os.path.join(model_path, filename), 'rb')
             agent_params = pickle.load(file)
