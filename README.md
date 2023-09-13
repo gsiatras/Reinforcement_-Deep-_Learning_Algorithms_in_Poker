@@ -38,6 +38,8 @@ Network architecture:
 
 ### Testing results vs Bluf Thresholf model ( model desinged to train agents ):
 
+![fig](https://github.com/gsiatras/Reinforcement_Deep_Learning_Algorithms_in_Poker/assets/94067900/ef9ff892-b227-486e-bce3-4806b803fc12)
+
 
 
 
