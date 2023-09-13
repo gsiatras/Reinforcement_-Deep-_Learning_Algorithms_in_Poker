@@ -36,6 +36,8 @@ Network architecture:
 ### State Represatation used (inspired by Alpha Holdem):
 ![Blank diagram](https://github.com/gsiatras/Reinforcement_Deep_Learning_Algorithms_in_Poker/assets/94067900/b310908a-9e67-4716-9622-b21a7e70634f)
 
+### Testing results vs Bluf Thresholf model ( model desinged to train agents ):
+
 
 
 
