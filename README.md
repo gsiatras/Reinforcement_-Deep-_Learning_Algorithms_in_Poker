@@ -1,6 +1,6 @@
-# Creating Reinforcement Learning agents on rlcard enviroment	
-# Project for Technical University of Crete 
-## Reinforcement Learning and Dynamic Optimization Course
+# Creating Reinforcement Learning agents on rlcard enviroment
+
+<img width="1322" alt="download" src="https://github.com/gsiatras/Reinforcement_Deep_Learning_Algorithms_in_Poker/assets/94067900/6f25fbd1-c603-4c8a-841e-6f403d039841">
 
 # New limit holdem game
 A limit holdem mode with shorter deck 4x(A, 10, J, Q, K), 1 hand card, 2 public cards		
@@ -39,6 +39,8 @@ Network architecture:
 ### Testing results vs Bluf Thresholf model ( model desinged to train agents ):
 
 ![fig](https://github.com/gsiatras/Reinforcement_Deep_Learning_Algorithms_in_Poker/assets/94067900/ef9ff892-b227-486e-bce3-4806b803fc12)
+
+Currently working on Adding convolutional networks and prioritized experince replay. 
 
 
 
