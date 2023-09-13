@@ -1,4 +1,6 @@
-# Creating Reinforcement Learning agents on rlcard enviroment		
+# Creating Reinforcement Learning agents on rlcard enviroment	
+# Project for Technical University of Crete 
+## Reinforcement Learning and Dynamic Optimization Course
 
 # New limit holdem game
 A limit holdem mode with shorter deck 4x(A, 10, J, Q, K), 1 hand card, 2 public cards		
