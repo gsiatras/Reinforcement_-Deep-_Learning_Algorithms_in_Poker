@@ -26,9 +26,12 @@ new_limit_holdem_human: play againt any suitable agent
 
 ### Double DQN Agent: double_dqn_agent(DoubleDQNAgent):
 Network architecture:
+![Blank diagram (1)](https://github.com/gsiatras/Reinforcement_Deep_Learning_Algorithms_in_Poker/assets/94067900/563249a3-21c4-47cf-be95-d7ce58af7f8c)
+
 
 ### Dueling Double DQN Agent: dueling_double_dqn_agent(DDDQNAgentV2)
 Network architecture:
+![Blank diagram (2)](https://github.com/gsiatras/Reinforcement_Deep_Learning_Algorithms_in_Poker/assets/94067900/7cf3ff8a-7c51-438a-9f52-4ba7dab4bed7)
 
 ### State Represatation used (inspired by Alpha Holdem):
 ![Blank diagram](https://github.com/gsiatras/Reinforcement_Deep_Learning_Algorithms_in_Poker/assets/94067900/b310908a-9e67-4716-9622-b21a7e70634f)
