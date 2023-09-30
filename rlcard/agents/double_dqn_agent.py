@@ -3,7 +3,6 @@ import random
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.init as init
 import torch.optim as optim
 import torch.nn.functional as F
 from collections import deque
@@ -12,6 +11,7 @@ from typing import Any
 from random import sample
 from rlcard.utils.utils import *
 import pickle
+import torch.nn.init as init
 
 
 @dataclass
@@ -22,9 +22,9 @@ class Trans:
     next_state: Any
     done: bool
 
-class MYDQNAgentV2(object):
+class DoubleDQNAgent(object):
     '''
-    DUELING DOUBLE DQN AGENT for limit texas holdem
+    DOUBLE DQN AGENT for limit texas holdem
     '''
     def __init__(self,
                  env,
@@ -58,10 +58,13 @@ class MYDQNAgentV2(object):
         self.agent_id = 0
         self.use_raw = False
         self.buffer_size = buffer_size
+
         self.model = Model(card_obs_shape, action_obs_shape, num_actions, self.learning_rate)  # model
         self.model.initialize_weights()
-        self.tgt = Model(card_obs_shape, action_obs_shape, num_actions, self.learning_rate)   # target model
+
+        self.tgt = Model(card_obs_shape, action_obs_shape, num_actions, self.learning_rate)  # target model
         self.tgt.initialize_weights()
+
         self.rb = ReplayBuffer(self.buffer_size)
         self.episodes = 0
         self.losses = []  # Store losses for monitoring
@@ -81,8 +84,7 @@ class MYDQNAgentV2(object):
 
 
     def train(self):
-        '''
-        Do 1 training iteration when buffer is full train the model and every x steps update the target model
+        ''' Do one iteration of QLA
         '''
         self.episodes += 1
         self.env.reset()
@@ -110,14 +112,12 @@ class MYDQNAgentV2(object):
         '''
         agents = self.env.get_agents()
         for id, agent in enumerate(agents):
-            if isinstance(agent, MYDQNAgentV2):
+            if isinstance(agent, DoubleDQNAgent):
                 self.agent_id = id
                 break
         self.start_pos.append(self.agent_id)
 
     def get_avg_loss(self):
-        '''Return the avg loss and the current epsilon
-        '''
         if len(self.losses) > 0:
             avg_loss = sum(self.losses) / len(self.losses)  # Calculate the average loss
         else:
@@ -131,6 +131,8 @@ class MYDQNAgentV2(object):
             self.epsilon = max(self.epsilon_min, self.epsilon * self.eps_decay)
 
     def train_self_play(self):
+        '''Self play training loop
+        '''
         # Check if the game is over to return the chips earned(reward of the game)
         current_player = self.env.get_player_id()
         if self.env.is_over():
@@ -176,7 +178,6 @@ class MYDQNAgentV2(object):
         epsilon policy
         Store transitions to buffer
         '''
-
         current_player = self.env.get_player_id()
         # Check if the game is over to return the chips earned(reward of the game)
         if self.env.is_over():
@@ -204,7 +205,6 @@ class MYDQNAgentV2(object):
             obs1, obs2 = self.prepare_data(card_obs, action_obs)
             with torch.no_grad():
                 qvals = self.model(obs1, obs2)
-                #print(qvals)
                 #print(qvals)
                 #print(legal_actions)
                 qvals = self.remove_illegal(qvals[0], legal_actions)
@@ -244,15 +244,13 @@ class MYDQNAgentV2(object):
 
     def prepare_data(self, obs1, obs2):
         '''Prepare data to enter the net (flatten)
-        Args:
-            card_state (card_state_shape = (x,y,z))
-            action_state (action_state_shape = (x,y,z))
-
-        Returns:
-            card_state_flat (card_state_shape = (1,(1,x*y*z))
-            action_state_flat (action_state_shape = (1,(x*y*z))
+               Args:
+                   card_state (card_state_shape = (x,y,z))
+                   action_state (action_state_shape = (x,y,z))
+               Returns:
+                   card_state_flat (card_state_shape = (1,(1,x*y*z))
+                   action_state_flat (action_state_shape = (1,(x*y*z))
         '''
-
         # Convert to float if not already
         obs1_tensor = torch.from_numpy(obs1).float()
         obs2_tensor = torch.from_numpy(obs2).float()
@@ -302,7 +300,6 @@ class MYDQNAgentV2(object):
             num_actions: num of actions, output of the net
         Returns:
             loss: loss of the update
-
             loss according to DQN paper
         '''
 
@@ -412,7 +409,6 @@ class MYDQNAgentV2(object):
                     else
                 none
         '''
-
         try:
             file = open(os.path.join(model_path, filename), 'rb')
             agent_params = pickle.load(file)
@@ -445,8 +441,7 @@ class MYDQNAgentV2(object):
 
             return agent_instance
         except FileNotFoundError:
-            print(f"\nINFO - No checkpoint file '{os.path.join(model_path, filename)}' found. Creating a new agent.")
-
+            print(f"\nINFO - No checkpoint file '{filename}' found. Creating a new agent.")
             return None
 
 
@@ -469,7 +464,7 @@ class Model(nn.Module):
             nn.Linear(input_dim1, 512),
             nn.ReLU(),
             nn.Linear(512, 512),
-            nn.ReLU()
+            nn.ReLU(),
         )
 
         self.layer_path2 = torch.nn.Sequential(
@@ -477,48 +472,17 @@ class Model(nn.Module):
             nn.Linear(input_dim2, 512),
             nn.ReLU(),
             nn.Linear(512, 512),
-            nn.ReLU()
+            nn.ReLU(),
         )
 
-        self.value_layer = nn.Sequential(
-            nn.Linear(2 * 512, 512),
-            nn.ReLU(),
-            nn.Linear(512, 1),
-        )
-#
-        self.advantage_layer = nn.Sequential(
+        self.final_layer = nn.Sequential(
             nn.Linear(2 * 512, 512),
             nn.ReLU(),
             nn.Linear(512, num_actions),
         )
 
         self.opt = optim.Adam(self.parameters(), lr=self.lr)
-
-    def initialize_weights(self):
-        '''
-        Initialize net weights
-        random small value for W
-        0 for bias
-        '''
-        for layer in self.layer_path1:
-            if isinstance(layer, nn.Linear):
-                init.normal_(layer.weight, mean=0, std=0.01)
-                init.constant_(layer.bias, 0)
-
-        for layer in self.layer_path2:
-            if isinstance(layer, nn.Linear):
-                init.normal_(layer.weight, mean=0, std=0.01)
-                init.constant_(layer.bias, 0)
-
-        for layer in self.value_layer:
-            if isinstance(layer, nn.Linear):
-                init.normal_(layer.weight, mean=0, std=0.01)
-                init.constant_(layer.bias, 0)
-
-        for layer in self.advantage_layer:
-            if isinstance(layer, nn.Linear):
-                init.normal_(layer.weight, mean=0, std=0.01)
-                init.constant_(layer.bias, 0)
+        self.mse_loss = nn.MSELoss(reduction='mean')
 
     def forward(self, obs1, obs2):
         '''Forward propagation
@@ -533,12 +497,32 @@ class Model(nn.Module):
         combined_features = torch.cat((obs1_out, obs2_out), dim=1)
 
         # Pass the combined features through the final layer
-        Values = self.value_layer(combined_features)
-        Advantages = self.advantage_layer(combined_features)
-        A_max = Advantages.max(dim=1, keepdim=True).values
-        Qvals = Values + (Advantages - (1/torch.abs(Advantages) * A_max))
+        actions = self.final_layer(combined_features)
+        return actions
+    def initialize_weights(self):
+        '''
+        Initialize net weights
+        random small value for W
+        0 for bias
+        '''
+        for layer in self.layer_path1:
+            if isinstance(layer, nn.Linear):
+                init.xavier_normal_(layer.weight, gain=1)
+                # init.normal_(layer.weight, mean=0, std=0.01)
+                init.constant_(layer.bias, 0)
 
-        return Qvals
+        for layer in self.layer_path2:
+            if isinstance(layer, nn.Linear):
+                init.xavier_normal_(layer.weight, gain=1)
+                # init.normal_(layer.weight, mean=0, std=0.01)
+                init.constant_(layer.bias, 0)
+
+        for layer in self.final_layer:
+            if isinstance(layer, nn.Linear):
+                init.xavier_normal_(layer.weight, gain=1)
+                # init.normal_(layer.weight, mean=0, std=0.01)
+                init.constant_(layer.bias, 0)
+
 
 
 class ReplayBuffer:
@@ -557,3 +541,29 @@ class ReplayBuffer:
 
     def size(self):
         return len(self.buffer)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
