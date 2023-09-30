@@ -22,7 +22,7 @@ from rlcard.agents.threshold_agent3 import ThresholdAgent3
 from rlcard.agents.sarsa_agent import SARSAAgent
 from rlcard.agents.ql_agent import QLAgent
 from rlcard.agents.pi_agent import PIAgent
-from rlcard.agents.my_dqn_agent import MYDQNAgent
+from rlcard.agents.double_dqn_agent import DoubleDQNAgent
 from rlcard.agents.bluff_agent import BluffAgent
-from rlcard.agents.my_dqn_agent_v2 import MYDQNAgentV2
+from rlcard.agents.dueling_double_dqn_agent import DDDQNAgent
 from rlcard.agents.my_dqn_agent_v3 import MYDQNAgentV3
