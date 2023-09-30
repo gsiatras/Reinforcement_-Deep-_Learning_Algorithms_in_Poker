@@ -40,7 +40,7 @@ Network architecture:
 
 ![fig](https://github.com/gsiatras/Reinforcement_Deep_Learning_Algorithms_in_Poker/assets/94067900/ef9ff892-b227-486e-bce3-4806b803fc12)
 
-Currently working on Adding convolutional networks and prioritized experince replay. 
+Currently working on optimizing our models and later on adding convolutional networks and prioritized experience replay. 
 
 
 
