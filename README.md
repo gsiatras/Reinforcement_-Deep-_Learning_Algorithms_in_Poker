@@ -1,6 +1,6 @@
 # Creating Reinforcement Learning agents on rlcard enviroment
 
-<img width="1322" alt="download" src="https://github.com/gsiatras/Reinforcement_Deep_Learning_Algorithms_in_Poker/assets/94067900/6f25fbd1-c603-4c8a-841e-6f403d039841">
+
 
 # New limit holdem game
 A limit holdem mode with shorter deck 4x(A, 10, J, Q, K), 1 hand card, 2 public cards		
